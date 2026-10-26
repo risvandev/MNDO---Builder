@@ -1,0 +1,12 @@
+name = "mndo-worker"
+main = "src/index.js"
+compatibility_date = "2024-03-01"
+
+[vars]
+PLATFORM_DOMAIN = "mndo.online"
+
+# Wildcard route for user subdomains
+# Note: Activate only AFTER adding mndo.online to Cloudflare and configuring proxied wildcard DNS.
+# routes = [
+#   { pattern = "*.mndo.online/*", zone_name = "mndo.online" }
+# ]

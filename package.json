@@ -1,0 +1,24 @@
+{
+  "name": "mndo-builder",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Free, lightweight website creation and publishing platform for students, developers, and portfolios.",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "worker:dev": "wrangler dev worker/src/index.js",
+    "worker:deploy": "wrangler deploy worker/src/index.js"
+  },
+  "dependencies": {
+    "@supabase/supabase-js": "^2.49.1"
+  },
+  "devDependencies": {
+    "vite": "^6.2.0",
+    "vitest": "^3.0.7",
+    "wrangler": "^3.111.0"
+  }
+}
