@@ -1,7 +1,7 @@
 // ==============================================================================
 // MNDO BUILDER - PUBLISHING & UNPUBLISHING CONTROLLER
 // ==============================================================================
-import { getClient, getCurrentUser } from './supabase.js';
+import { getClient, getCurrentUser, getMockState, saveMockState } from './supabase.js';
 import { isUserVerified } from './auth.js';
 import { validateSubdomainSlug, checkSubdomainAvailability } from './validation.js';
 import { CONFIG } from './config.js';
@@ -55,8 +55,7 @@ export async function publishSite(siteId, subdomainSlug) {
   }
 
   // Demo fallback mode
-  const raw = localStorage.getItem('mndo_mock_state_v1');
-  const state = raw ? JSON.parse(raw) : {};
+  const state = getMockState();
   const site = state.sites?.find(s => s.id === siteId);
   if (site) {
     site.status = 'published';
@@ -64,7 +63,7 @@ export async function publishSite(siteId, subdomainSlug) {
     site.published_revision = (site.published_revision || 0) + 1;
     site.published_at = new Date().toISOString();
     site.updated_at = new Date().toISOString();
-    localStorage.setItem('mndo_mock_state_v1', JSON.stringify(state));
+    saveMockState(state);
   }
 
   return {
@@ -91,13 +90,12 @@ export async function unpublishSite(siteId) {
   }
 
   // Demo fallback mode
-  const raw = localStorage.getItem('mndo_mock_state_v1');
-  const state = raw ? JSON.parse(raw) : {};
+  const state = getMockState();
   const site = state.sites?.find(s => s.id === siteId);
   if (site) {
     site.status = 'unpublished';
     site.updated_at = new Date().toISOString();
-    localStorage.setItem('mndo_mock_state_v1', JSON.stringify(state));
+    saveMockState(state);
   }
   return { success: true };
 }

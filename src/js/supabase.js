@@ -24,29 +24,33 @@ if (isBackendConfigured()) {
 // DEMO / MOCK STORAGE ADAPTER
 // When real Supabase credentials are not yet configured, permits seamless local UI testing
 // ------------------------------------------------------------------------------
-const MOCK_STORAGE_KEY = 'mndo_mock_state_v1';
+export const MOCK_STORAGE_KEY = 'mndo_app_state_v2';
 
-function getMockState() {
-  const raw = localStorage.getItem(MOCK_STORAGE_KEY);
+export function getMockState() {
+  try {
+    if (typeof localStorage !== 'undefined' && localStorage.getItem('mndo_mock_state_v1')) {
+      localStorage.removeItem('mndo_mock_state_v1');
+    }
+  } catch (e) {}
+
+  const raw = typeof localStorage !== 'undefined' ? localStorage.getItem(MOCK_STORAGE_KEY) : null;
   if (raw) {
-    try { return JSON.parse(raw); } catch (e) {}
+    try {
+      const parsed = JSON.parse(raw);
+      if (parsed) {
+        if (!Array.isArray(parsed.sites)) parsed.sites = [];
+        if (!Array.isArray(parsed.pages)) parsed.pages = [];
+        if (!Array.isArray(parsed.posts)) parsed.posts = [];
+        if (!Array.isArray(parsed.messages)) parsed.messages = [];
+        return parsed;
+      }
+    } catch (e) {}
   }
 
-  // Initial starter mock state
+  // Initial starter mock state for first-time visitors is unauthenticated
   const initial = {
-    user: {
-      id: 'demo-user-123',
-      email: 'student@example.com',
-      email_confirmed_at: new Date().toISOString(),
-      user_metadata: { full_name: 'Risvan Demo' }
-    },
-    profile: {
-      id: 'demo-user-123',
-      display_name: 'Risvan Demo',
-      is_verified: true,
-      storage_used_bytes: 1048576,
-      max_sites: 3
-    },
+    user: null,
+    profile: null,
     sites: [
       {
         id: 'site-demo-1',
@@ -138,8 +142,10 @@ function getMockState() {
   return initial;
 }
 
-function saveMockState(state) {
-  localStorage.setItem(MOCK_STORAGE_KEY, JSON.stringify(state));
+export function saveMockState(state) {
+  if (typeof localStorage !== 'undefined') {
+    localStorage.setItem(MOCK_STORAGE_KEY, JSON.stringify(state));
+  }
 }
 
 // ------------------------------------------------------------------------------
@@ -246,6 +252,32 @@ export async function saveSiteDraft(siteId, updates) {
   return state.sites[idx];
 }
 
+export async function saveSitePosts(siteId, posts) {
+  if (supabase) {
+    return posts;
+  }
+  const state = getMockState();
+  state.posts = (state.posts || []).filter(p => p.site_id !== siteId);
+  posts.forEach(p => {
+    state.posts.push({ ...p, site_id: siteId });
+  });
+  saveMockState(state);
+  return posts;
+}
+
+export async function saveSitePages(siteId, pages) {
+  if (supabase) {
+    return pages;
+  }
+  const state = getMockState();
+  state.pages = (state.pages || []).filter(p => p.site_id !== siteId);
+  pages.forEach(p => {
+    state.pages.push({ ...p, site_id: siteId });
+  });
+  saveMockState(state);
+  return pages;
+}
+
 export async function createSite(siteData) {
   if (supabase) {
     const user = await getCurrentUser();
@@ -291,6 +323,25 @@ export async function createSite(siteData) {
     updated_at: new Date().toISOString()
   };
   state.sites.unshift(newSite);
+
+  if (siteData.posts && Array.isArray(siteData.posts)) {
+    siteData.posts.forEach(p => {
+      state.posts.push({ ...p, site_id: newSite.id });
+    });
+  } else if (newSite.site_type === 'blog' || newSite.template_id === 'personal-blog') {
+    state.posts.push({
+      id: `post-${Date.now()}`,
+      site_id: newSite.id,
+      title: 'First Story or Thesis Chapter',
+      slug: 'first-story',
+      excerpt: 'Welcome to my writings. You can write your thesis, personal stories, essays, or research here.',
+      body_markdown: '# Welcome to My Writings\n\nThis is where you can write your thesis, personal stories, essays, or research papers.\n\nEvery published piece of writing receives its own dedicated, permanent URL on your subdomain.',
+      tags: ['story', 'writing'],
+      status: 'published',
+      published_at: new Date().toISOString()
+    });
+  }
+
   saveMockState(state);
   return newSite;
 }

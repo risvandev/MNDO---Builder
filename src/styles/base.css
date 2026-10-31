@@ -1,48 +1,75 @@
 /* ==============================================================================
    MNDO BUILDER - BASE DESIGN SYSTEM & TOKENS
+   Inspired by nifu.nifal.tech: warm paper white canvas, rich charcoal ink,
+   hairline borders, pill controls, and subtle natural shadows.
    ============================================================================== */
 
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Outfit:wght@500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Outfit:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap');
 
 :root {
-  /* Color Palette */
-  --bg-dark: #07090e;
-  --bg-surface: #0e121b;
-  --bg-card: rgba(18, 24, 38, 0.75);
-  --bg-card-hover: rgba(26, 34, 52, 0.9);
-  --border-subtle: rgba(255, 255, 255, 0.08);
-  --border-focus: #6366f1;
-  --border-hover: rgba(255, 255, 255, 0.16);
-  
-  /* Brand Accents */
-  --primary: #6366f1;
-  --primary-hover: #4f46e5;
-  --primary-glow: rgba(99, 102, 241, 0.28);
-  --accent-cyan: #06b6d4;
+  /* Warm White Editorial Palette (nifu.nifal.tech reference) */
+  --paper: #fafaf8;
+  --paper-soft: #f4f4f0;
+  --paper-card: #ffffff;
+  --paper-subtle: #edede7;
+  --band: #f1f1ec;
+
+  --ink: #151515;
+  --ink-secondary: #333330;
+  --muted: #6e6e6a;
+  --muted-light: #8e8e8a;
+  --text-dim: #9e9e98;
+
+  --line: #deded8;
+  --line-subtle: #eaeae5;
+  --line-strong: #bdbdb7;
+
+  /* Aliases for semantic backward compatibility */
+  --bg-dark: var(--paper);
+  --bg-surface: var(--paper-soft);
+  --bg-card: var(--paper-card);
+  --bg-card-hover: #ffffff;
+  --border-subtle: var(--line);
+  --border-hover: var(--line-strong);
+  --border-focus: #151515;
+
+  /* Primary Action: Solid obsidian charcoal button / pill */
+  --primary: #151515;
+  --primary-hover: #262626;
+  --primary-glow: rgba(0, 0, 0, 0.08);
+
+  /* Accents */
   --accent-emerald: #10b981;
-  --accent-rose: #f43f5e;
-  --accent-amber: #f59e0b;
+  --accent-emerald-soft: rgba(16, 185, 129, 0.08);
+  --accent-cyan: #0284c7;
+  --accent-cyan-soft: rgba(2, 132, 199, 0.08);
+  --accent-rose: #e11d48;
+  --accent-rose-soft: rgba(225, 29, 72, 0.08);
+  --accent-amber: #d97706;
+  --accent-amber-soft: rgba(217, 119, 6, 0.08);
 
   /* Typography Colors */
-  --text-main: #f8fafc;
-  --text-muted: #94a3b8;
-  --text-dim: #64748b;
-  
+  --text-main: var(--ink);
+  --text-muted: var(--muted);
+
   /* Fonts */
   --font-heading: 'Outfit', -apple-system, BlinkMacSystemFont, sans-serif;
   --font-sans: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
   --font-mono: 'JetBrains Mono', monospace;
 
-  /* Elevation & Shadows */
-  --shadow-sm: 0 2px 8px rgba(0, 0, 0, 0.25);
-  --shadow-md: 0 8px 24px rgba(0, 0, 0, 0.35);
-  --shadow-lg: 0 16px 40px rgba(0, 0, 0, 0.5);
-  --shadow-glow: 0 0 25px var(--primary-glow);
+  /* Elevation & Shadows (subtle, airy shadows for light aesthetic) */
+  --shadow-xs: 0 1px 2px rgba(0, 0, 0, 0.03);
+  --shadow-sm: 0 2px 8px rgba(0, 0, 0, 0.04);
+  --shadow-md: 0 8px 24px rgba(0, 0, 0, 0.06);
+  --shadow-lg: 0 16px 40px rgba(0, 0, 0, 0.08);
+  --shadow-glow: 0 8px 30px rgba(0, 0, 0, 0.06);
 
-  /* Radius */
-  --radius-sm: 6px;
-  --radius-md: 10px;
-  --radius-lg: 16px;
+  /* Radius (pill-forward design system) */
+  --radius-xs: 4px;
+  --radius-sm: 8px;
+  --radius-md: 12px;
+  --radius-lg: 18px;
+  --radius-xl: 24px;
   --radius-full: 9999px;
 
   /* Transitions */
@@ -59,8 +86,8 @@
 
 html, body {
   min-height: 100vh;
-  background-color: var(--bg-dark);
-  color: var(--text-main);
+  background-color: var(--paper);
+  color: var(--ink);
   font-family: var(--font-sans);
   font-size: 15px;
   line-height: 1.6;
@@ -69,31 +96,16 @@ html, body {
   overflow-x: hidden;
 }
 
-/* Ambient Background Glow */
+/* Pristine Subtle Paper Texture */
 body::before {
   content: '';
   position: fixed;
-  top: -20%;
-  left: 10%;
-  width: 50vw;
-  height: 50vw;
-  border-radius: 50%;
-  background: radial-gradient(circle, rgba(99, 102, 241, 0.08) 0%, transparent 70%);
+  inset: 0;
+  background-image: radial-gradient(rgba(0, 0, 0, 0.03) 1px, transparent 0);
+  background-size: 24px 24px;
   pointer-events: none;
   z-index: 0;
-}
-
-body::after {
-  content: '';
-  position: fixed;
-  bottom: -15%;
-  right: 5%;
-  width: 45vw;
-  height: 45vw;
-  border-radius: 50%;
-  background: radial-gradient(circle, rgba(6, 182, 212, 0.06) 0%, transparent 70%);
-  pointer-events: none;
-  z-index: 0;
+  opacity: 0.6;
 }
 
 #app {
@@ -107,24 +119,137 @@ body::after {
 /* Typography Defaults */
 h1, h2, h3, h4, h5, h6 {
   font-family: var(--font-heading);
-  color: var(--text-main);
-  line-height: 1.2;
+  color: var(--ink);
+  line-height: 1.25;
   font-weight: 700;
+  letter-spacing: -0.02em;
 }
 
 a {
-  color: var(--primary);
+  color: var(--ink);
   text-decoration: none;
-  transition: color var(--transition-fast);
+  transition: opacity var(--transition-fast), color var(--transition-fast);
 }
 
 a:hover {
-  color: #818cf8;
+  color: #000;
+  opacity: 0.85;
 }
 
 button, input, select, textarea {
   font-family: inherit;
   font-size: inherit;
+}
+
+/* Brand Dot and Pulsing Live Beacon */
+.brand-dot {
+  display: inline-block;
+  width: 6px;
+  height: 6px;
+  background-color: var(--ink);
+  border-radius: 50%;
+  margin-left: 2px;
+  vertical-align: baseline;
+}
+
+.pulse-beacon {
+  display: inline-block;
+  width: 7px;
+  height: 7px;
+  background: var(--accent-emerald);
+  border-radius: 50%;
+  box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.7);
+  animation: pulseBeacon 2s infinite;
+  vertical-align: middle;
+  margin-right: 6px;
+}
+
+@keyframes pulseBeacon {
+  0% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.6); }
+  70% { transform: scale(1); box-shadow: 0 0 0 6px rgba(16, 185, 129, 0); }
+  100% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(16, 185, 129, 0); }
+}
+
+/* Minimal Editorial Hero Elements & Writing Effect */
+.hero-eyebrow-wrap {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  width: 100%;
+  margin-bottom: 22px;
+}
+
+.hero-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 2.2px;
+  color: var(--muted);
+  background: #ffffff;
+  border: 1px solid var(--line);
+  padding: 6px 16px;
+  border-radius: var(--radius-full);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.02);
+}
+
+.hero-thin-title {
+  font-family: var(--font-heading);
+  font-size: clamp(38px, 6.5vw, 72px);
+  font-weight: 300;
+  letter-spacing: -0.04em;
+  color: var(--ink);
+  line-height: 1.15;
+  margin: 0 auto 20px;
+  min-height: 1.28em;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  width: 100%;
+  max-width: 960px;
+}
+
+.typing-cursor {
+  display: inline-block;
+  font-weight: 200;
+  color: var(--ink);
+  margin-left: 4px;
+  animation: blinkCursor 0.9s infinite;
+  user-select: none;
+}
+
+@keyframes blinkCursor {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0; }
+}
+
+.hero-subtext {
+  font-size: 16px;
+  color: var(--muted);
+  max-width: 580px;
+  margin: 0 auto 28px;
+  line-height: 1.6;
+  text-align: center;
+}
+
+.hero-highlights {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 16px;
+  margin-top: 32px;
+  font-size: 13px;
+  color: var(--muted);
+  flex-wrap: wrap;
+}
+
+.hero-highlights span {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
 }
 
 /* Scrollbars */
@@ -134,14 +259,14 @@ button, input, select, textarea {
 }
 
 ::-webkit-scrollbar-track {
-  background: var(--bg-dark);
+  background: var(--paper);
 }
 
 ::-webkit-scrollbar-thumb {
-  background: rgba(255, 255, 255, 0.15);
+  background: #d4d4ce;
   border-radius: 4px;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: rgba(255, 255, 255, 0.25);
+  background: #b8b8b0;
 }

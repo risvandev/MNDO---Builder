@@ -60,7 +60,7 @@ describe('Production Template Engine & Zero-Runtime Validation', () => {
     ]
   };
 
-  it('renders all 8 templates successfully with clean semantic HTML', () => {
+  it('renders all production templates successfully with clean semantic HTML', () => {
     for (const tmpl of TEMPLATES) {
       const siteCopy = JSON.parse(JSON.stringify(baseSiteData));
       siteCopy.site.template_id = tmpl.id;
@@ -83,6 +83,137 @@ describe('Production Template Engine & Zero-Runtime Validation', () => {
       expect(html).not.toContain('__NEXT_DATA__');
       expect(html).not.toContain('_jsx');
     }
+  });
+
+  it('renders minimal-text template with sub-5KB raw prose index and reader', () => {
+    const textSite = JSON.parse(JSON.stringify(baseSiteData));
+    textSite.site.template_id = 'minimal-text';
+
+    const indexRes = renderSite(textSite, '/');
+    expect(indexRes.status).toBe(200);
+    expect(indexRes.body).toContain('Writings &amp; Essays');
+
+    const readerRes = renderSite(textSite, '/blog/zero-runtime-publishing');
+    expect(readerRes.status).toBe(200);
+    expect(readerRes.body).toContain('Zero-Runtime Publishing');
+    expect(readerRes.body).toContain('Pure HTML is undefeated');
+  });
+
+  it('renders interactive-resume template with print button and experience', () => {
+    const resumeSite = JSON.parse(JSON.stringify(baseSiteData));
+    resumeSite.site.template_id = 'interactive-resume';
+
+    const result = renderSite(resumeSite, '/');
+    expect(result.status).toBe(200);
+    expect(result.body).toContain('Print / PDF');
+    expect(result.body).toContain('Professional Experience');
+    expect(result.body).toContain('Staff Engineer');
+  });
+
+  it('renders product-launch template with metric counters and conversion CTA', () => {
+    const launchSite = JSON.parse(JSON.stringify(baseSiteData));
+    launchSite.site.template_id = 'product-launch';
+
+    const result = renderSite(launchSite, '/');
+    expect(result.status).toBe(200);
+    expect(result.body).toContain('metrics-bar');
+    expect(result.body).toContain('cta-box');
+    expect(result.body).toContain('Ready to launch your project?');
+  });
+
+  it('renders visual-gallery template with masonry grid and visual projects', () => {
+    const gallerySite = JSON.parse(JSON.stringify(baseSiteData));
+    gallerySite.site.template_id = 'visual-gallery';
+
+    const result = renderSite(gallerySite, '/');
+    expect(result.status).toBe(200);
+    expect(result.body).toContain('gallery-grid');
+    expect(result.body).toContain('gallery-card');
+  });
+
+  it('renders digital-garden template with botanical stage indicators and search', () => {
+    const gardenSite = JSON.parse(JSON.stringify(baseSiteData));
+    gardenSite.site.template_id = 'digital-garden';
+
+    const indexRes = renderSite(gardenSite, '/');
+    expect(indexRes.status).toBe(200);
+    expect(indexRes.body).toContain('Digital Garden');
+    expect(indexRes.body).toContain('gardenSearchInput');
+
+    const noteRes = renderSite(gardenSite, '/blog/zero-runtime-publishing');
+    expect(noteRes.status).toBe(200);
+    expect(noteRes.body).toContain('note-stage-badge');
+    expect(noteRes.body).toContain('Growing in public');
+  });
+
+  it('renders thesis-story template with chapter reader and progress bar', () => {
+    const thesisSite = JSON.parse(JSON.stringify(baseSiteData));
+    thesisSite.site.template_id = 'thesis-story';
+
+    const indexRes = renderSite(thesisSite, '/');
+    expect(indexRes.status).toBe(200);
+    expect(indexRes.body).toContain('Table of Contents');
+
+    const readerRes = renderSite(thesisSite, '/blog/zero-runtime-publishing');
+    expect(readerRes.status).toBe(200);
+    expect(readerRes.body).toContain('reading-progress-bar');
+    expect(readerRes.body).toContain('Zero-Runtime Publishing');
+  });
+
+  it('renders research-scholar template with sticky card and publication badges', () => {
+    const scholarSite = JSON.parse(JSON.stringify(baseSiteData));
+    scholarSite.site.template_id = 'research-scholar';
+
+    const result = renderSite(scholarSite, '/');
+    expect(result.status).toBe(200);
+    expect(result.body).toContain('scholar-sidebar');
+    expect(result.body).toContain('Publications &amp; Works');
+    expect(result.body).toContain('PDF / Article');
+  });
+
+  it('renders docs-book template with sidebar tree and topic search', () => {
+    const docsSite = JSON.parse(JSON.stringify(baseSiteData));
+    docsSite.site.template_id = 'docs-book';
+
+    const result = renderSite(docsSite, '/');
+    expect(result.status).toBe(200);
+    expect(result.body).toContain('docs-sidebar');
+    expect(result.body).toContain('docSearchInput');
+    expect(result.body).toContain('doc-nav-list');
+  });
+
+  it('renders split-engineer template with 2-column layout and sticky nav', () => {
+    const engineerSite = JSON.parse(JSON.stringify(baseSiteData));
+    engineerSite.site.template_id = 'split-engineer';
+
+    const result = renderSite(engineerSite, '/');
+    expect(result.status).toBe(200);
+    expect(result.body).toContain('split-container');
+    expect(result.body).toContain('split-left');
+    expect(result.body).toContain('side-nav');
+    expect(result.body).toContain('Selected Projects');
+  });
+
+  it('renders design-engineer template with status pill and case studies', () => {
+    const designSite = JSON.parse(JSON.stringify(baseSiteData));
+    designSite.site.template_id = 'design-engineer';
+
+    const result = renderSite(designSite, '/');
+    expect(result.status).toBe(200);
+    expect(result.body).toContain('status-pill');
+    expect(result.body).toContain('case-studies');
+    expect(result.body).toContain('Selected Work &amp; Case Studies');
+  });
+
+  it('renders oss-maintainer template with install banner and repository cards', () => {
+    const ossSite = JSON.parse(JSON.stringify(baseSiteData));
+    ossSite.site.template_id = 'oss-maintainer';
+
+    const result = renderSite(ossSite, '/');
+    expect(result.status).toBe(200);
+    expect(result.body).toContain('install-banner');
+    expect(result.body).toContain('repo-grid');
+    expect(result.body).toContain('Pinned Packages &amp; Repositories');
   });
 
   it('renders individual published blog posts correctly in reader view', () => {

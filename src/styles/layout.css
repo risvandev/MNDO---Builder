@@ -1,5 +1,6 @@
 /* ==============================================================================
    MNDO BUILDER - LAYOUT & GRID STYLES
+   Warm Editorial Layout (nifu.nifal.tech reference)
    ============================================================================== */
 
 .app-container {
@@ -16,15 +17,15 @@
   padding: 0 24px;
 }
 
-/* Header & Top Navigation */
+/* Header & Sticky Top Navigation */
 .app-header {
   position: sticky;
   top: 0;
   z-index: 100;
-  background: rgba(7, 9, 14, 0.85);
+  background: rgba(250, 250, 248, 0.92);
   backdrop-filter: blur(16px);
   -webkit-backdrop-filter: blur(16px);
-  border-bottom: 1px solid var(--border-subtle);
+  border-bottom: 1px solid var(--line-subtle);
   transition: all var(--transition-fast);
 }
 
@@ -44,37 +45,38 @@
 }
 
 .brand-icon {
-  width: 36px;
-  height: 36px;
-  border-radius: var(--radius-md);
-  background: linear-gradient(135deg, var(--primary), var(--accent-cyan));
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
+  background: var(--ink);
   display: flex;
   align-items: center;
   justify-content: center;
   color: #fff;
   font-family: var(--font-heading);
   font-weight: 800;
-  font-size: 18px;
-  box-shadow: 0 4px 12px var(--primary-glow);
+  font-size: 16px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.12);
 }
 
 .brand-title {
   font-family: var(--font-heading);
   font-size: 20px;
   font-weight: 800;
-  color: var(--text-main);
-  letter-spacing: -0.02em;
+  color: var(--ink);
+  letter-spacing: -0.03em;
 }
 
 .brand-badge {
-  font-size: 11px;
+  font-size: 10px;
   font-weight: 700;
   text-transform: uppercase;
-  background: rgba(99, 102, 241, 0.15);
-  color: #a5b4fc;
-  padding: 2px 8px;
+  letter-spacing: 0.08em;
+  background: var(--paper-soft);
+  color: var(--muted);
+  padding: 3px 10px;
   border-radius: var(--radius-full);
-  border: 1px solid rgba(99, 102, 241, 0.3);
+  border: 1px solid var(--line);
 }
 
 .main-nav {
@@ -84,7 +86,7 @@
 }
 
 .nav-item {
-  color: var(--text-muted);
+  color: var(--muted);
   font-size: 14px;
   font-weight: 500;
   text-decoration: none;
@@ -92,13 +94,13 @@
 }
 
 .nav-item:hover, .nav-item.active {
-  color: var(--text-main);
+  color: var(--ink);
 }
 
 .nav-actions {
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: 10px;
 }
 
 /* Main Content Wrapper */
@@ -111,6 +113,12 @@
 /* Page Section */
 .page-section {
   padding: 80px 0;
+}
+
+.page-section-alt {
+  background: var(--paper-soft);
+  border-top: 1px solid var(--line-subtle);
+  border-bottom: 1px solid var(--line-subtle);
 }
 
 .page-section-sm {
@@ -126,30 +134,33 @@
 
 .section-tag {
   display: inline-block;
-  font-size: 12px;
-  font-weight: 700;
+  font-size: 11px;
+  font-weight: 600;
   text-transform: uppercase;
-  letter-spacing: 0.12em;
-  color: var(--primary);
+  letter-spacing: 2.8px;
+  color: var(--muted);
   margin-bottom: 12px;
 }
 
 .section-title {
-  font-size: clamp(32px, 4vw, 44px);
-  margin-bottom: 16px;
-  letter-spacing: -0.02em;
+  font-size: clamp(30px, 4vw, 44px);
+  color: var(--ink);
+  font-weight: 800;
+  letter-spacing: -0.03em;
+  margin-bottom: 14px;
+  line-height: 1.15;
 }
 
 .section-desc {
-  font-size: 17px;
-  color: var(--text-muted);
+  font-size: 16px;
+  color: var(--muted);
   line-height: 1.6;
 }
 
 /* Footer */
 .app-footer {
-  border-top: 1px solid var(--border-subtle);
-  background: var(--bg-surface);
+  border-top: 1px solid var(--line);
+  background: var(--paper-soft);
   padding: 64px 0 32px;
   margin-top: auto;
 }
@@ -163,11 +174,11 @@
 
 .footer-col-title {
   font-family: var(--font-heading);
-  font-size: 14px;
+  font-size: 11px;
   font-weight: 700;
   text-transform: uppercase;
-  letter-spacing: 0.08em;
-  color: var(--text-main);
+  letter-spacing: 2px;
+  color: var(--ink);
   margin-bottom: 16px;
 }
 
@@ -179,24 +190,24 @@
 }
 
 .footer-link {
-  color: var(--text-muted);
+  color: var(--muted);
   font-size: 14px;
   text-decoration: none;
   transition: color var(--transition-fast);
 }
 
 .footer-link:hover {
-  color: var(--text-main);
+  color: var(--ink);
 }
 
 .footer-bottom {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  border-top: 1px solid var(--border-subtle);
+  border-top: 1px solid var(--line-subtle);
   padding-top: 24px;
   font-size: 13px;
-  color: var(--text-dim);
+  color: var(--muted-light);
 }
 
 @media (max-width: 900px) {

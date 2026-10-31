@@ -1,7 +1,7 @@
 // ==============================================================================
 // MNDO BUILDER - AUTHENTICATION CONTROLLER (SUPABASE AUTH)
 // ==============================================================================
-import { getClient, getCurrentUser, getUserProfile } from './supabase.js';
+import { getClient, getCurrentUser, getUserProfile, getMockState, saveMockState } from './supabase.js';
 import { isBackendConfigured } from './config.js';
 
 /**
@@ -20,7 +20,7 @@ export async function signUpWithEmail(email, password, displayName) {
         data: {
           full_name: displayName
         },
-        emailRedirectTo: `${window.location.origin}/#/auth/callback`
+        emailRedirectTo: `${window.location.origin}/auth/callback`
       }
     });
 
@@ -39,8 +39,7 @@ export async function signUpWithEmail(email, password, displayName) {
     user_metadata: { full_name: displayName },
     email_confirmed_at: new Date().toISOString()
   };
-  const raw = localStorage.getItem('mndo_mock_state_v1');
-  const state = raw ? JSON.parse(raw) : {};
+  const state = getMockState();
   state.user = mockUser;
   state.profile = {
     id: mockUser.id,
@@ -49,7 +48,7 @@ export async function signUpWithEmail(email, password, displayName) {
     storage_used_bytes: 0,
     max_sites: 3
   };
-  localStorage.setItem('mndo_mock_state_v1', JSON.stringify(state));
+  saveMockState(state);
   return { user: mockUser, session: { access_token: 'mock-token' }, requiresEmailVerification: false };
 }
 
@@ -70,12 +69,11 @@ export async function signInWithEmail(email, password) {
   }
 
   // Demo mode
-  const raw = localStorage.getItem('mndo_mock_state_v1');
-  const state = raw ? JSON.parse(raw) : {};
+  const state = getMockState();
   if (!state.user) {
-    state.user = { id: 'demo-user-123', email, email_confirmed_at: new Date().toISOString() };
+    state.user = { id: `user-${Date.now()}`, email, email_confirmed_at: new Date().toISOString() };
     state.profile = { id: state.user.id, display_name: email.split('@')[0], is_verified: true, max_sites: 3 };
-    localStorage.setItem('mndo_mock_state_v1', JSON.stringify(state));
+    saveMockState(state);
   }
   return { user: state.user, session: { access_token: 'mock-token' } };
 }
@@ -89,7 +87,7 @@ export async function signInWithGoogle() {
     const { data, error } = await supabase.auth.signInWithOAuth({
       provider: 'google',
       options: {
-        redirectTo: `${window.location.origin}/#/auth/callback`
+        redirectTo: `${window.location.origin}/auth/callback`
       }
     });
     if (error) throw error;
@@ -107,7 +105,7 @@ export async function resetPasswordForEmail(email) {
   const supabase = getClient();
   if (supabase) {
     const { data, error } = await supabase.auth.resetPasswordForEmail(email, {
-      redirectTo: `${window.location.origin}/#/auth/reset-password`
+      redirectTo: `${window.location.origin}/auth/reset-password`
     });
     if (error) throw error;
     return data;
@@ -126,14 +124,13 @@ export async function signOut() {
     if (error) throw error;
   } else {
     // Clear mock active user
-    const raw = localStorage.getItem('mndo_mock_state_v1');
-    if (raw) {
-      const state = JSON.parse(raw);
-      state.user = null;
-      localStorage.setItem('mndo_mock_state_v1', JSON.stringify(state));
-    }
+    const state = getMockState();
+    state.user = null;
+    state.profile = null;
+    saveMockState(state);
   }
-  window.location.hash = '#/';
+  window.history.pushState(null, '', '/');
+  window.dispatchEvent(new PopStateEvent('popstate'));
 }
 
 /**

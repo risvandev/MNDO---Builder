@@ -1,8 +1,8 @@
 // ==============================================================================
 // MNDO BUILDER - MINIMAL USER DASHBOARD
 // ==============================================================================
-import { getCurrentUser, getUserProfile, getUserSites, deleteSite, getContactMessages } from './supabase.js';
-import { isUserVerified, signOut } from './auth.js';
+import { getCurrentUser, getUserProfile, getUserSites, deleteSite } from './supabase.js';
+import { signOut } from './auth.js';
 import { openModal } from './components/modal.js';
 import { showToast } from './components/toast.js';
 import { unpublishSite } from './publishing.js';
@@ -11,31 +11,34 @@ import { CONFIG } from './config.js';
 export async function renderDashboard(container) {
   const user = await getCurrentUser();
   if (!user) {
-    window.location.hash = '#/auth';
+    window.history.pushState(null, '', '/login');
+    window.dispatchEvent(new PopStateEvent('popstate'));
     return;
   }
 
   container.innerHTML = `
-    <div class="app-container" style="padding-top:40px; padding-bottom:60px;">
-      <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:32px; flex-wrap:wrap; gap:16px;">
+    <div class="app-container" style="max-width:960px; padding-top:48px; padding-bottom:80px;">
+      <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:32px; padding-bottom:20px; border-bottom:1px solid var(--line);">
         <div>
-          <h1 style="font-size:28px; font-weight:800; margin-bottom:6px;">My Websites</h1>
-          <p style="color:var(--text-muted); font-size:14px;">Manage, edit, and publish your personal portfolios and sites.</p>
+          <h1 style="font-size:24px; font-weight:600; letter-spacing:-0.03em; color:var(--ink); margin:0;">Websites</h1>
         </div>
-        <div style="display:flex; gap:12px;">
-          <a href="#/create" class="btn btn-primary" id="btnCreateNewSite">+ Create New Website</a>
+        <div style="display:flex; align-items:center; gap:12px;">
+          <button class="btn btn-outline btn-sm" id="btnSignOut" style="padding:6px 14px; font-size:13px;">Sign Out</button>
+          <a href="/create" class="btn btn-primary btn-sm" id="btnCreateNewSite" style="padding:6px 16px; font-size:13px;">+ New Site</a>
         </div>
       </div>
 
-      <!-- Quota & Verification Banner -->
-      <div id="quotaBanner" style="margin-bottom:28px;"></div>
-
       <!-- Sites Grid -->
-      <div id="sitesList" style="display:grid; grid-template-columns:repeat(auto-fill, minmax(340px, 1fr)); gap:24px;">
-        <div style="padding:40px; text-align:center; color:var(--text-muted); grid-column:1/-1;">Loading your websites...</div>
+      <div id="sitesList" style="display:grid; grid-template-columns:repeat(auto-fill, minmax(300px, 1fr)); gap:20px;">
+        <div style="padding:48px; text-align:center; color:var(--muted); font-size:14px; grid-column:1/-1;">Loading...</div>
       </div>
     </div>
   `;
+
+  // Attach sign out event
+  container.querySelector('#btnSignOut')?.addEventListener('click', () => {
+    signOut();
+  });
 
   await loadDashboardData(container, user);
 }
@@ -44,111 +47,70 @@ async function loadDashboardData(container, user) {
   try {
     const profile = await getUserProfile(user.id);
     const sites = await getUserSites(user.id);
-    const verified = await isUserVerified(user);
-
-    const quotaBanner = container.querySelector('#quotaBanner');
     const sitesList = container.querySelector('#sitesList');
     const btnCreate = container.querySelector('#btnCreateNewSite');
 
     const maxSites = profile?.max_sites || CONFIG.LIMITS.MAX_SITES_PER_ACCOUNT;
     const sitesCount = sites.length;
-    const storageUsedMb = ((profile?.storage_used_bytes || 0) / (1024 * 1024)).toFixed(1);
 
-    // Disable create button if quota reached
-    if (sitesCount >= maxSites) {
+    if (btnCreate && sitesCount >= maxSites) {
       btnCreate.classList.add('disabled');
       btnCreate.style.opacity = '0.5';
       btnCreate.style.pointerEvents = 'none';
-      btnCreate.title = 'Max websites limit reached';
+      btnCreate.title = `Site limit reached (${maxSites} max)`;
     }
-
-    quotaBanner.innerHTML = `
-      <div class="card" style="padding:16px 20px; display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:16px;">
-        <div style="display:flex; align-items:center; gap:20px; flex-wrap:wrap;">
-          <div>
-            <span style="font-size:12px; color:var(--text-dim); text-transform:uppercase; font-weight:700;">Sites Allowed:</span>
-            <span style="font-weight:700; margin-left:6px; color:#fff;">${sitesCount} of ${maxSites}</span>
-          </div>
-          <div>
-            <span style="font-size:12px; color:var(--text-dim); text-transform:uppercase; font-weight:700;">Storage Used:</span>
-            <span style="font-weight:700; margin-left:6px; color:#fff;">${storageUsedMb} MB of 20 MB</span>
-          </div>
-          <div>
-            <span style="font-size:12px; color:var(--text-dim); text-transform:uppercase; font-weight:700;">Email Status:</span>
-            <span style="margin-left:6px; font-weight:600; color:${verified ? 'var(--accent-emerald)' : 'var(--accent-amber)'}">
-              ${verified ? '✓ Verified' : '⚠ Verification Pending (Required to publish)'}
-            </span>
-          </div>
-        </div>
-        <button class="btn btn-outline btn-sm" id="btnSignOut">Sign Out</button>
-      </div>
-    `;
-
-    container.querySelector('#btnSignOut').addEventListener('click', () => {
-      signOut();
-    });
 
     if (sites.length === 0) {
       sitesList.innerHTML = `
-        <div class="card" style="grid-column:1/-1; text-align:center; padding:64px 24px;">
-          <div style="font-size:40px; margin-bottom:16px;">🚀</div>
-          <h2 style="font-size:22px; font-weight:700; margin-bottom:8px;">You haven't created any websites yet</h2>
-          <p style="color:var(--text-muted); max-width:440px; margin:0 auto 24px;">Choose from our 8 templates and publish your free personal portfolio or blog in minutes.</p>
-          <a href="#/create" class="btn btn-primary">+ Create Your First Website</a>
+        <div style="grid-column:1/-1; text-align:center; padding:72px 24px; border:1px dashed var(--line); border-radius:16px; background:#ffffff;">
+          <p style="font-size:15px; font-weight:500; color:var(--ink); margin-bottom:6px;">No websites yet</p>
+          <p style="font-size:13px; color:var(--muted); margin-bottom:20px;">Create your personal site or portfolio and publish it on mndo.online.</p>
+          <a href="/create" class="btn btn-primary btn-sm">+ Create Website</a>
         </div>
       `;
       return;
     }
 
-    // Render sites cards
     sitesList.innerHTML = '';
     for (const site of sites) {
       const card = document.createElement('div');
-      card.className = 'card card-hover';
-      card.style.display = 'flex';
-      card.style.flexDirection = 'column';
-      card.style.justifyContent = 'space-between';
+      card.className = 'card';
+      card.style.cssText = 'padding:22px 24px; background:#ffffff; border:1px solid var(--line); border-radius:14px; display:flex; flex-direction:column; justify-content:space-between; gap:18px; transition:border-color 0.15s ease; box-shadow:0 1px 3px rgba(0,0,0,0.02);';
 
       const isPub = site.status === 'published';
       const pubUrl = `https://${site.subdomain_slug}.${CONFIG.PLATFORM_DOMAIN}`;
-      const lastUpdated = new Date(site.updated_at || site.created_at).toLocaleDateString('en-US', {
-        month: 'short', day: 'numeric', year: 'numeric'
-      });
 
       card.innerHTML = `
         <div>
-          <div style="display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:12px;">
-            <span class="badge ${isPub ? 'badge-published' : 'badge-draft'}">
+          <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
+            <a href="/editor/${site.id}" style="font-size:16px; font-weight:600; color:var(--ink); text-decoration:none; letter-spacing:-0.01em;">
+              ${escapeHtml(site.title || 'Untitled Site')}
+            </a>
+            <span class="badge ${isPub ? 'badge-published' : 'badge-draft'}" style="font-size:11px; padding:2px 8px; font-weight:500;">
               <span class="badge-dot"></span>
-              ${site.status}
+              ${isPub ? 'Live' : 'Draft'}
             </span>
-            <span style="font-size:12px; color:var(--text-dim); text-transform:uppercase; font-weight:600;">${site.site_type}</span>
           </div>
-          <h3 style="font-size:18px; font-weight:700; margin-bottom:6px; color:#fff;">${escapeHtml(site.title)}</h3>
-          <p style="font-size:13px; color:var(--text-muted); margin-bottom:16px; line-height:1.5;">${escapeHtml(site.description || 'No description added yet.')}</p>
-          
-          <div style="margin-bottom:16px; font-size:13px;">
-            <div style="color:var(--text-dim); margin-bottom:4px;">Address:</div>
+
+          <div>
             ${isPub 
-              ? `<a href="${pubUrl}" target="_blank" rel="noopener" style="font-family:var(--font-mono); font-size:13px; color:var(--accent-cyan); display:flex; align-items:center; gap:4px;">
-                   <span>${site.subdomain_slug}.${CONFIG.PLATFORM_DOMAIN}</span> ↗
+              ? `<a href="${pubUrl}" target="_blank" rel="noopener" style="font-family:var(--font-mono); font-size:13px; color:var(--muted); text-decoration:none; display:inline-flex; align-items:center; gap:4px; word-break:break-all;">
+                   <span>${site.subdomain_slug}.${CONFIG.PLATFORM_DOMAIN}</span>
+                   <span style="font-size:11px; opacity:0.7;">↗</span>
                  </a>`
-              : `<span style="font-family:var(--font-mono); color:var(--text-muted); font-size:12px;">${site.subdomain_slug}.${CONFIG.PLATFORM_DOMAIN} (Draft)</span>`
+              : `<span style="font-family:var(--font-mono); font-size:13px; color:var(--muted); word-break:break-all;">${site.subdomain_slug}.${CONFIG.PLATFORM_DOMAIN}</span>`
             }
           </div>
         </div>
 
-        <div>
-          <div style="font-size:12px; color:var(--text-dim); margin-bottom:16px; border-top:1px solid var(--border-subtle); padding-top:12px;">
-            Template: <strong>${site.template_id}</strong> &bull; Updated ${lastUpdated}
+        <div style="display:flex; justify-content:space-between; align-items:center; padding-top:14px; border-top:1px solid var(--line-subtle);">
+          <div style="display:flex; gap:8px;">
+            <a href="/editor/${site.id}" class="btn btn-secondary btn-sm" style="padding:4px 12px; font-size:12px;">Edit</a>
+            ${isPub ? `<a href="${pubUrl}" target="_blank" rel="noopener" class="btn btn-outline btn-sm" style="padding:4px 10px; font-size:12px;">Visit</a>` : ''}
           </div>
-          <div style="display:flex; gap:8px; flex-wrap:wrap;">
-            <a href="#/editor/${site.id}" class="btn btn-primary btn-sm" style="flex:1;">Edit Website</a>
-            ${isPub 
-              ? `<button class="btn btn-outline btn-sm btn-unpublish" data-id="${site.id}">Unpublish</button>`
-              : ''
-            }
-            <button class="btn btn-danger btn-sm btn-delete" data-id="${site.id}" title="Delete site">&times;</button>
+          <div style="display:flex; gap:6px;">
+            ${isPub ? `<button class="btn btn-outline btn-sm btn-unpublish" data-id="${site.id}" style="padding:4px 10px; font-size:12px; color:var(--muted);" title="Unpublish">Unpublish</button>` : ''}
+            <button class="btn btn-outline btn-sm btn-delete" data-id="${site.id}" style="padding:4px 10px; font-size:12px; color:var(--muted);" title="Delete">Delete</button>
           </div>
         </div>
       `;
@@ -159,13 +121,13 @@ async function loadDashboardData(container, user) {
         unpubBtn.addEventListener('click', async () => {
           openModal({
             title: 'Unpublish Website?',
-            contentHtml: `<p>Your website will be immediately taken offline and made inaccessible to the public. Your saved content and draft will remain safely preserved in your dashboard.</p>`,
-            confirmText: 'Unpublish Now',
+            contentHtml: `<p>Your website will be taken offline immediately. You can re-publish it at any time.</p>`,
+            confirmText: 'Unpublish',
             isDanger: true,
             onConfirm: async () => {
               try {
                 await unpublishSite(site.id);
-                showToast('Website unpublished successfully.', 'info');
+                showToast('Website unpublished.', 'info');
                 await loadDashboardData(container, user);
               } catch (e) {
                 showToast(e.message, 'error');
@@ -179,8 +141,8 @@ async function loadDashboardData(container, user) {
       card.querySelector('.btn-delete').addEventListener('click', () => {
         openModal({
           title: 'Delete Website?',
-          contentHtml: `<p>Are you sure you want to delete <strong>${escapeHtml(site.title)}</strong>? All pages, blog posts, and associated assets will be permanently deleted. This cannot be undone.</p>`,
-          confirmText: 'Delete Permanently',
+          contentHtml: `<p>Permanently delete <strong>${escapeHtml(site.title)}</strong>? This cannot be undone.</p>`,
+          confirmText: 'Delete',
           isDanger: true,
           onConfirm: async () => {
             try {

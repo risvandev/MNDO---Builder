@@ -9,6 +9,17 @@ import { renderCreative } from './creative.js';
 import { renderModern } from './modern.js';
 import { renderPersonalBlog } from './personal-blog.js';
 import { renderBusiness } from './business.js';
+import { renderThesisStory } from './thesis-story.js';
+import { renderResearchScholar } from './research-scholar.js';
+import { renderDocsBook } from './docs-book.js';
+import { renderMinimalText } from './minimal-text.js';
+import { renderInteractiveResume } from './interactive-resume.js';
+import { renderProductLaunch } from './product-launch.js';
+import { renderVisualGallery } from './visual-gallery.js';
+import { renderDigitalGarden } from './digital-garden.js';
+import { renderSplitEngineer } from './split-engineer.js';
+import { renderDesignEngineer } from './design-engineer.js';
+import { renderOssMaintainer } from './oss-maintainer.js';
 import {
   renderRobotsTxt,
   renderSitemapXml,
@@ -19,7 +30,7 @@ import {
 } from './seo-generators.js';
 
 /**
- * Catalog of the 8 production templates with metadata, features, and descriptions.
+ * Catalog of production templates with metadata, features, and descriptions.
  */
 export const TEMPLATES = [
   {
@@ -93,6 +104,105 @@ export const TEMPLATES = [
     features: ['Value proposition hero', 'Services grid', 'Customer testimonials', 'Operating details', 'Consultation form'],
     accentDefault: '#0284c7',
     renderer: renderBusiness
+  },
+  {
+    id: 'thesis-story',
+    name: 'Thesis & Long-form Story',
+    category: 'Writing & Thesis',
+    description: 'Long-form thesis chapters, serialized stories, and essays with reading progress, estimated reading time, and clean table of contents.',
+    features: ['Chapter reader', 'Reading progress bar', 'Reading time estimate', 'Table of contents', 'Author card'],
+    accentDefault: '#854d0e',
+    renderer: renderThesisStory
+  },
+  {
+    id: 'research-scholar',
+    name: 'Research & Publication Scholar',
+    category: 'Academic & Research',
+    description: 'Two-column academic split with sticky scholar identity card, publications with PDF/Code/Cite badges, and credentials timeline.',
+    features: ['Sticky scholar card', 'Publication badges (PDF/Code/Cite)', 'Research interests', 'Education timeline', 'Contact form'],
+    accentDefault: '#0369a1',
+    renderer: renderResearchScholar
+  },
+  {
+    id: 'docs-book',
+    name: 'Technical Docs & Knowledge Base',
+    category: 'Docs & Handbook',
+    description: 'Documentation tree sidebar, real-time topic search, code blocks, callout notice admonitions, and breadcrumb navigation.',
+    features: ['Documentation tree', 'Live search filter', 'Code copy blocks', 'Callout admonitions', 'Prev/Next navigation'],
+    accentDefault: '#0284c7',
+    renderer: renderDocsBook
+  },
+  {
+    id: 'minimal-text',
+    name: 'Ultra-Minimalist TXT',
+    category: 'Writing & Essay',
+    description: 'Sub-5KB text-first publishing inspired by Bear Blog & Mataroa. Instant 0.05s load time, zero clutter, and pure focus on prose.',
+    features: ['Sub-5KB footprint', 'Instant load speed', 'Pure prose focus', 'Chronological index', 'Dark/Light adaptive'],
+    accentDefault: '#171717',
+    renderer: renderMinimalText
+  },
+  {
+    id: 'interactive-resume',
+    name: 'Interactive CV & Resume',
+    category: 'Career & Resume',
+    description: 'Crisp digital resume inspired by Read.cv & JSON Resume. One-click PDF print stylesheet, experience timeline, and verified skills pills.',
+    features: ['Print-to-PDF ready', 'Career timeline', 'Skills matrix', 'Credentials list', 'Selected works'],
+    accentDefault: '#0f172a',
+    renderer: renderInteractiveResume
+  },
+  {
+    id: 'product-launch',
+    name: 'Product & SaaS Launchpad',
+    category: 'Landing & Launch',
+    description: 'High-converting single-page landing inspired by Carrd & Indie Hackers with metric counters, feature cards, and lead capture form.',
+    features: ['Metric stat counters', 'Feature cards grid', 'Social proof badges', 'Conversion CTA', 'Lead inquiry form'],
+    accentDefault: '#6366f1',
+    renderer: renderProductLaunch
+  },
+  {
+    id: 'visual-gallery',
+    name: 'Visual Showcase & Gallery',
+    category: 'Design & Photo',
+    description: 'Spatial visual portfolio inspired by Cargo Collective & VSCO Grid with full-bleed project cards, image hover effects, and tag overlays.',
+    features: ['Masonry grid layout', 'Image hover zoom', 'Category tag pills', 'Visual statement', 'Studio inquiry'],
+    accentDefault: '#0a0a0a',
+    renderer: renderVisualGallery
+  },
+  {
+    id: 'digital-garden',
+    name: 'Digital Garden & Notes',
+    category: 'Notes & Garden',
+    description: 'Networked public thought stream inspired by Quartz & Obsidian with botanical growth stages (Seedling, Budding, Evergreen) and live search.',
+    features: ['Botanical growth stages', 'Live note search', 'Idea stream', 'Tag categorization', 'Public second brain'],
+    accentDefault: '#059669',
+    renderer: renderDigitalGarden
+  },
+  {
+    id: 'split-engineer',
+    name: 'Staff Engineer (Split Screen)',
+    category: 'Developer & Tech',
+    description: 'Iconic 2-column split portfolio inspired by Brittany Chiang v4. Sticky navigation with active scroll tracking, project cards, and tech stack pills.',
+    features: ['Sticky split navigation', 'Scroll spy tracker', 'Project cards', 'Experience chronology', 'Tech stack pills'],
+    accentDefault: '#64ffda',
+    renderer: renderSplitEngineer
+  },
+  {
+    id: 'design-engineer',
+    name: 'Design Engineer & Craft',
+    category: 'Design & Frontend',
+    description: 'Craft-focused portfolio inspired by Linear & Rauno Freiberg. For UI/UX designers and frontend architects highlighting case studies with metrics.',
+    features: ['Case study metrics', 'Craft philosophy', 'Live project links', 'Interactive stack', 'Status beacon'],
+    accentDefault: '#6366f1',
+    renderer: renderDesignEngineer
+  },
+  {
+    id: 'oss-maintainer',
+    name: 'Open Source Toolmaker',
+    category: 'Open Source & CLI',
+    description: 'Repository showcase inspired by top open-source maintainers. Features GitHub repo cards with star/fork badges, CLI install banner, and sponsorship CTA.',
+    features: ['GitHub repo cards', 'Stars & forks metrics', 'CLI installation pill', 'Sponsorship badge', 'Tech ecosystems'],
+    accentDefault: '#8b5cf6',
+    renderer: renderOssMaintainer
   }
 ];
 

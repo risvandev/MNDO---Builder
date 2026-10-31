@@ -1,9 +1,18 @@
 // ==============================================================================
 // MNDO BUILDER - FORM-BASED STUDIO EDITOR & LIVE PREVIEW CONTROLLER
+// Contextual tabs based on website type:
+// - Blog / Writing: [Content] [Design]
+// - Portfolio / Landing: [Content] [Pages] [Design]
 // ==============================================================================
-import { getSiteById, saveSiteDraft, getContactMessages, markMessageRead, deleteSite } from './supabase.js';
+import {
+  getSiteById,
+  saveSiteDraft,
+  saveSitePosts,
+  saveSitePages,
+  deleteSite
+} from './supabase.js';
 import { renderSite, TEMPLATES } from '../templates/index.js';
-import { validateSubdomainSlug, checkSubdomainAvailability } from './validation.js';
+import { checkSubdomainAvailability } from './validation.js';
 import { publishSite, unpublishSite } from './publishing.js';
 import { uploadAsset } from './uploads.js';
 import { showToast } from './components/toast.js';
@@ -11,11 +20,10 @@ import { openModal } from './components/modal.js';
 import { CONFIG } from './config.js';
 
 let activeSiteData = null; // { site, pages, posts }
-let activeTab = 'content'; // 'content' | 'pages' | 'blog' | 'design' | 'publish' | 'inbox' | 'settings'
+let activeTab = 'content'; // 'content' | 'pages' | 'design'
 let activeDevice = 'desktop'; // 'desktop' | 'tablet' | 'mobile'
 let previewPath = '/';
 let debounceTimer = null;
-let availabilityTimer = null;
 
 export async function renderEditor(container, siteId) {
   container.innerHTML = `
@@ -31,11 +39,33 @@ export async function renderEditor(container, siteId) {
       <div class="app-container" style="padding:60px 0; text-align:center;">
         <h2>Website Not Found</h2>
         <p style="color:var(--text-muted); margin:12px 0 24px;">The requested website could not be found or you do not have permission to edit it.</p>
-        <a href="#/dashboard" class="btn btn-primary">Return to Dashboard</a>
+        <a href="/dashboard" class="btn btn-primary">Return to Dashboard</a>
       </div>
     `;
     return;
   }
+
+  const site = activeSiteData.site;
+  const isBlog = site.site_type === 'blog' || ['personal-blog', 'thesis-story', 'minimal-text', 'digital-garden'].includes(site.template_id);
+
+  // Ensure activeTab is valid for site type
+  if (isBlog && activeTab === 'pages') {
+    activeTab = 'content';
+  }
+
+  // Dynamic tabs: Blog has Content & Design only; Portfolio/Landing has Content, Pages, and Design
+  const tabsHtml = isBlog ? `
+    <div class="editor-tabs">
+      <button class="editor-tab-item ${activeTab === 'content' ? 'active' : ''}" data-tab="content">Content</button>
+      <button class="editor-tab-item ${activeTab === 'design' ? 'active' : ''}" data-tab="design">Design</button>
+    </div>
+  ` : `
+    <div class="editor-tabs">
+      <button class="editor-tab-item ${activeTab === 'content' ? 'active' : ''}" data-tab="content">Content</button>
+      <button class="editor-tab-item ${activeTab === 'pages' ? 'active' : ''}" data-tab="pages">Pages</button>
+      <button class="editor-tab-item ${activeTab === 'design' ? 'active' : ''}" data-tab="design">Design</button>
+    </div>
+  `;
 
   container.innerHTML = `
     <div class="studio-container">
@@ -43,30 +73,30 @@ export async function renderEditor(container, siteId) {
       <aside class="editor-sidebar">
         <div class="editor-header">
           <div style="display:flex; align-items:center; gap:12px;">
-            <a href="#/dashboard" class="icon-btn" title="Back to Dashboard">&larr;</a>
+            <a href="/dashboard" class="icon-btn" title="Back to Dashboard">&larr;</a>
             <div>
-              <div class="editor-site-title" id="siteTitleDisplay">${escapeHtml(activeSiteData.site.title)}</div>
+              <div class="editor-site-title" id="siteTitleDisplay">${escapeHtml(site.title)}</div>
               <div style="font-size:11px; color:var(--text-dim); font-family:var(--font-mono);">
-                ${activeSiteData.site.subdomain_slug}.${CONFIG.PLATFORM_DOMAIN}
+                ${site.subdomain_slug}.${CONFIG.PLATFORM_DOMAIN}
               </div>
             </div>
           </div>
-          <button class="btn btn-primary btn-sm" id="btnQuickPublish">
-            ${activeSiteData.site.status === 'published' ? 'Republish' : 'Publish'}
-          </button>
+          <div style="display:flex; align-items:center; gap:8px;">
+            <button class="icon-btn" id="btnOpenSettings" title="Site Settings & SEO">
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <circle cx="12" cy="12" r="3"></circle>
+                <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path>
+              </svg>
+            </button>
+            <button class="btn btn-primary btn-sm" id="btnQuickPublish">
+              ${site.status === 'published' ? 'Republish' : 'Publish'}
+            </button>
+          </div>
         </div>
 
         <!-- Navigation Tabs -->
         <div style="padding:14px 24px 0;">
-          <div class="editor-tabs">
-            <button class="editor-tab-item active" data-tab="content">Content</button>
-            <button class="editor-tab-item" data-tab="pages">Pages</button>
-            <button class="editor-tab-item" data-tab="blog">Blog</button>
-            <button class="editor-tab-item" data-tab="design">Design</button>
-            <button class="editor-tab-item" data-tab="publish">Publish</button>
-            <button class="editor-tab-item" data-tab="inbox" id="tabInboxBtn">Inbox</button>
-            <button class="editor-tab-item" data-tab="settings">Settings</button>
-          </div>
+          ${tabsHtml}
         </div>
 
         <!-- Editor Tab Content Panels -->
@@ -78,16 +108,24 @@ export async function renderEditor(container, siteId) {
       <!-- Right: Isolated Live Preview -->
       <main class="editor-preview">
         <div class="preview-toolbar">
-          <div class="device-switcher">
-            <button class="device-btn active" data-device="desktop">🖥 Desktop</button>
-            <button class="device-btn" data-device="tablet">📱 Tablet</button>
-            <button class="device-btn" data-device="mobile">📱 Mobile</button>
+          <div style="display:flex; align-items:center; gap:8px;">
+            <div class="device-switcher">
+              <button class="device-btn active" data-device="desktop">🖥 Desktop</button>
+              <button class="device-btn" data-device="tablet">📱 Tablet</button>
+              <button class="device-btn" data-device="mobile">📱 Mobile</button>
+            </div>
+            <button class="icon-btn" id="btnPreviewHome" title="Back to Homepage" style="${previewPath === '/' ? 'display:none;' : 'display:inline-flex;'}; font-size:12px; font-weight:600; padding:4px 10px; background:var(--paper-soft); border:1px solid var(--line); border-radius:var(--radius-full);">
+              ← Home
+            </button>
           </div>
           <div class="preview-address-bar">
             <span>🔒</span>
-            <span id="previewAddress">https://${activeSiteData.site.subdomain_slug}.${CONFIG.PLATFORM_DOMAIN}</span>
+            <span id="previewAddress">https://${site.subdomain_slug}.${CONFIG.PLATFORM_DOMAIN}${previewPath === '/' ? '' : previewPath}</span>
           </div>
-          <button class="icon-btn" id="btnReloadPreview" title="Refresh Preview">🔄</button>
+          <div style="display:flex; align-items:center; gap:6px;">
+            <button class="icon-btn" id="btnOpenPreviewTab" title="Open Isolated Preview in New Tab" style="font-size:13px; font-weight:700;">↗</button>
+            <button class="icon-btn" id="btnReloadPreview" title="Refresh Canvas">🔄</button>
+          </div>
         </div>
         <div class="preview-viewport-wrap">
           <iframe id="previewFrame" class="preview-frame desktop" title="Website Live Preview" sandbox="allow-scripts allow-forms allow-same-origin"></iframe>
@@ -98,6 +136,7 @@ export async function renderEditor(container, siteId) {
 
   setupTabListeners(container);
   setupPreviewListeners(container);
+  setupHeaderListeners(container);
   renderActiveTabContent(container);
   updateLivePreview();
 }
@@ -115,11 +154,17 @@ function setupTabListeners(container) {
       renderActiveTabContent(container);
     });
   });
+}
 
-  container.querySelector('#btnQuickPublish').addEventListener('click', () => {
-    // Switch to publish tab directly
-    const pubTab = container.querySelector('[data-tab="publish"]');
-    if (pubTab) pubTab.click();
+function setupHeaderListeners(container) {
+  // Quick publish modal trigger
+  container.querySelector('#btnQuickPublish')?.addEventListener('click', () => {
+    openPublishModal(container);
+  });
+
+  // Settings & SEO modal trigger
+  container.querySelector('#btnOpenSettings')?.addEventListener('click', () => {
+    openSettingsModal(container);
   });
 }
 
@@ -136,10 +181,38 @@ function setupPreviewListeners(container) {
     });
   });
 
-  container.querySelector('#btnReloadPreview').addEventListener('click', () => {
+  // Refresh canvas button
+  container.querySelector('#btnReloadPreview')?.addEventListener('click', () => {
     updateLivePreview();
-    showToast('Preview reloaded', 'info', 1500);
+    showToast('Canvas refreshed', 'info', 1200);
   });
+
+  // Home button inside preview toolbar
+  container.querySelector('#btnPreviewHome')?.addEventListener('click', () => {
+    previewPath = '/';
+    updateLivePreview();
+  });
+
+  // Open preview in isolated new tab
+  container.querySelector('#btnOpenPreviewTab')?.addEventListener('click', () => {
+    const rendered = renderSite(activeSiteData, previewPath);
+    const blob = new Blob([rendered.body], { type: 'text/html' });
+    const blobUrl = URL.createObjectURL(blob);
+    window.open(blobUrl, '_blank');
+  });
+
+  // Listen to navigation events from inside the isolated preview iframe
+  const handleCanvasMessage = (event) => {
+    if (event.data && event.data.type === 'MNDO_CANVAS_NAVIGATE') {
+      const nextPath = event.data.path || '/';
+      if (nextPath !== previewPath) {
+        previewPath = nextPath;
+        updateLivePreview();
+      }
+    }
+  };
+  window.removeEventListener('message', handleCanvasMessage);
+  window.addEventListener('message', handleCanvasMessage);
 }
 
 // ------------------------------------------------------------------------------
@@ -149,19 +222,307 @@ function renderActiveTabContent(container) {
   const panel = container.querySelector('#editorTabContent');
   if (!panel) return;
 
-  if (activeTab === 'content') renderContentTab(panel);
-  else if (activeTab === 'pages') renderPagesTab(panel);
-  else if (activeTab === 'blog') renderBlogTab(panel);
-  else if (activeTab === 'design') renderDesignTab(panel);
-  else if (activeTab === 'publish') renderPublishTab(panel);
-  else if (activeTab === 'inbox') renderInboxTab(panel);
-  else if (activeTab === 'settings') renderSettingsTab(panel);
+  const site = activeSiteData.site;
+  const isBlog = site.site_type === 'blog' || site.template_id === 'personal-blog' || site.template_id === 'thesis-story';
+
+  if (activeTab === 'content') {
+    if (isBlog) {
+      renderBlogContentTab(panel);
+    } else {
+      renderPortfolioContentTab(panel);
+    }
+  } else if (activeTab === 'pages') {
+    if (isBlog) {
+      activeTab = 'content';
+      renderBlogContentTab(panel);
+    } else {
+      renderPagesTab(panel);
+    }
+  } else if (activeTab === 'design') {
+    renderDesignTab(panel);
+  }
 }
 
 // ------------------------------------------------------------------------------
-// 1. CONTENT TAB (SECTIONS)
+// 1A. BLOG & WRITING CONTENT TAB (THESIS, STORY, ARTICLES)
 // ------------------------------------------------------------------------------
-function renderContentTab(panel) {
+function renderBlogContentTab(panel) {
+  const site = activeSiteData.site;
+  const content = site.content || {};
+  const hero = content.hero || {};
+  const posts = activeSiteData.posts || [];
+
+  panel.innerHTML = `
+    <!-- Publication & Writer Profile -->
+    <div class="section-item">
+      <div class="section-item-header" onclick="this.parentElement.classList.toggle('collapsed')">
+        <div class="section-item-left">
+          <span>✍️</span>
+          <span class="section-item-title">Publication & Author</span>
+        </div>
+        <span class="icon-btn">▼</span>
+      </div>
+      <div class="section-item-body">
+        <div class="form-group">
+          <label class="form-label">Publication Title</label>
+          <input type="text" class="form-input" id="blogPubTitle" value="${escapeHtml(hero.headline || site.title || '')}" placeholder="e.g. Thesis on Modern Systems or Personal Journal">
+        </div>
+        <div class="form-group">
+          <label class="form-label">Tagline or Theme</label>
+          <input type="text" class="form-input" id="blogPubTagline" value="${escapeHtml(hero.tagline || '')}" placeholder="e.g. Explorations in distributed computing & engineering">
+        </div>
+        <div class="form-group">
+          <label class="form-label">About the Writer / Publication</label>
+          <textarea class="form-textarea" rows="3" id="blogPubBio" placeholder="A brief description of this publication, research, or writing...">${escapeHtml(hero.bio || '')}</textarea>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Author Avatar / Portrait URL</label>
+          <input type="text" class="form-input" id="blogAvatarUrl" value="${escapeHtml(hero.avatarUrl || '')}" placeholder="https://example.com/avatar.jpg">
+        </div>
+      </div>
+    </div>
+
+    <!-- Writings, Stories & Articles -->
+    <div style="margin-top:24px; margin-bottom:14px; display:flex; justify-content:space-between; align-items:center;">
+      <div>
+        <h3 style="font-size:16px; font-weight:700; color:var(--ink); margin-bottom:2px;">Writings & Stories (${posts.length})</h3>
+        <p style="font-size:12px; color:var(--muted);">Each story or thesis chapter receives its own URL.</p>
+      </div>
+      <button class="btn btn-primary btn-sm" id="btnWriteNewPost" style="padding:6px 14px; font-size:12px;">+ Write New</button>
+    </div>
+
+    <div class="repeater-list" id="blogPostsList">
+      ${posts.length === 0 ? `
+        <div style="text-align:center; padding:32px 16px; border:1px dashed var(--line); border-radius:12px; background:#ffffff; color:var(--muted); font-size:13px;">
+          <p style="margin-bottom:12px; font-weight:500; color:var(--ink);">No writings published yet.</p>
+          <p style="margin-bottom:16px;">Write a thesis chapter, story, essay, or article to share with your audience.</p>
+          <button class="btn btn-secondary btn-sm" id="btnWriteFirstPost">+ Write Your First Story</button>
+        </div>
+      ` : ''}
+
+      ${posts.map((post, idx) => {
+        const isPub = post.status === 'published';
+        const postUrl = `https://${site.subdomain_slug}.${CONFIG.PLATFORM_DOMAIN}/blog/${post.slug}`;
+        return `
+          <div class="card" style="margin-bottom:12px; padding:16px; background:#ffffff; border:1px solid var(--line); border-radius:12px;">
+            <div style="display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:6px;">
+              <div>
+                <span class="badge ${isPub ? 'badge-published' : 'badge-draft'}" style="font-size:10px; padding:2px 7px; margin-bottom:6px;">
+                  ${post.status}
+                </span>
+                <h4 style="font-size:15px; font-weight:700; color:var(--ink); margin:0;">${escapeHtml(post.title)}</h4>
+              </div>
+              <button class="icon-btn btn-delete-post" data-idx="${idx}" title="Delete story">&times;</button>
+            </div>
+            
+            <div style="margin-bottom:12px;">
+              <span style="font-family:var(--font-mono); font-size:11px; color:var(--muted); word-break:break-all;">
+                /blog/${escapeHtml(post.slug)}
+              </span>
+            </div>
+
+            <div style="display:flex; justify-content:space-between; align-items:center;">
+              <div style="display:flex; gap:6px;">
+                <button class="btn btn-secondary btn-sm btn-edit-post" data-idx="${idx}" style="padding:4px 10px; font-size:12px;">Edit</button>
+                <button class="btn btn-outline btn-sm btn-preview-post" data-slug="${post.slug}" style="padding:4px 10px; font-size:12px;">Preview</button>
+              </div>
+              ${isPub ? `
+                <a href="${postUrl}" target="_blank" rel="noopener" style="font-size:12px; color:var(--muted); text-decoration:underline;">Visit ↗</a>
+              ` : ''}
+            </div>
+          </div>
+        `;
+      }).join('')}
+    </div>
+  `;
+
+  // Publication event listeners
+  const titleInput = panel.querySelector('#blogPubTitle');
+  if (titleInput) {
+    titleInput.addEventListener('input', (e) => {
+      content.hero = content.hero || {};
+      content.hero.headline = e.target.value;
+      site.title = e.target.value;
+      document.getElementById('siteTitleDisplay').textContent = e.target.value;
+      scheduleDraftSave();
+    });
+  }
+
+  const taglineInput = panel.querySelector('#blogPubTagline');
+  if (taglineInput) {
+    taglineInput.addEventListener('input', (e) => {
+      content.hero = content.hero || {};
+      content.hero.tagline = e.target.value;
+      scheduleDraftSave();
+    });
+  }
+
+  const bioInput = panel.querySelector('#blogPubBio');
+  if (bioInput) {
+    bioInput.addEventListener('input', (e) => {
+      content.hero = content.hero || {};
+      content.hero.bio = e.target.value;
+      scheduleDraftSave();
+    });
+  }
+
+  const avatarInput = panel.querySelector('#blogAvatarUrl');
+  if (avatarInput) {
+    avatarInput.addEventListener('input', (e) => {
+      content.hero = content.hero || {};
+      content.hero.avatarUrl = e.target.value;
+      scheduleDraftSave();
+    });
+  }
+
+  // Create new writing triggers
+  const openNew = () => openPostEditor(null, panel);
+  panel.querySelector('#btnWriteNewPost')?.addEventListener('click', openNew);
+  panel.querySelector('#btnWriteFirstPost')?.addEventListener('click', openNew);
+
+  // Edit writing triggers
+  panel.querySelectorAll('.btn-edit-post').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const idx = parseInt(btn.getAttribute('data-idx'), 10);
+      openPostEditor(idx, panel);
+    });
+  });
+
+  // Delete writing triggers
+  panel.querySelectorAll('.btn-delete-post').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const idx = parseInt(btn.getAttribute('data-idx'), 10);
+      activeSiteData.posts.splice(idx, 1);
+      saveSitePosts(activeSiteData.site.id, activeSiteData.posts);
+      renderBlogContentTab(panel);
+      previewPath = '/';
+      updateLivePreview();
+      showToast('Writing removed.', 'info');
+    });
+  });
+
+  // Preview writing triggers
+  panel.querySelectorAll('.btn-preview-post').forEach(btn => {
+    btn.addEventListener('click', () => {
+      previewPath = `/blog/${btn.getAttribute('data-slug')}`;
+      updateLivePreview();
+    });
+  });
+}
+
+function openPostEditor(postIdx, parentPanel) {
+  const isNew = postIdx === null;
+  const post = !isNew ? activeSiteData.posts[postIdx] : {
+    title: 'New Story / Thesis Chapter',
+    slug: 'new-story',
+    excerpt: 'A brief summary of this writing piece.',
+    body_markdown: '# Title\n\nStart writing your story, thesis chapter, essay, or thoughts here...',
+    tags: ['writing'],
+    status: 'published'
+  };
+
+  openModal({
+    title: isNew ? 'Write New Story / Article' : 'Edit Story / Article',
+    contentHtml: `
+      <div class="form-group">
+        <label class="form-label">Title / Chapter Name</label>
+        <input type="text" class="form-input" id="postModalTitle" value="${escapeHtml(post.title)}">
+      </div>
+
+      <div class="form-group">
+        <label class="form-label">URL Slug</label>
+        <div class="subdomain-input-group">
+          <span class="subdomain-prefix">/blog/</span>
+          <input type="text" class="subdomain-input" id="postModalSlug" value="${escapeHtml(post.slug)}" placeholder="story-slug">
+        </div>
+        <div class="form-hint">Address: https://${activeSiteData.site.subdomain_slug}.${CONFIG.PLATFORM_DOMAIN}/blog/<span id="slugMirror">${post.slug}</span></div>
+      </div>
+
+      <div class="form-group">
+        <label class="form-label">Excerpt / Short Summary</label>
+        <textarea class="form-textarea" rows="2" id="postModalExcerpt" placeholder="1-2 sentences summarizing this piece...">${escapeHtml(post.excerpt || '')}</textarea>
+      </div>
+
+      <div class="form-group">
+        <label class="form-label">Writing Content (Markdown Supported)</label>
+        <textarea class="form-textarea" rows="12" id="postModalBody" style="font-family:var(--font-mono); font-size:13px; line-height:1.6;" placeholder="Write your full story or thesis here...">${escapeHtml(post.body_markdown || '')}</textarea>
+        <div class="form-hint">Supports **bold**, *italic*, headers (#, ##), quotes (>), lists, and images.</div>
+      </div>
+
+      <div style="display:grid; grid-template-columns:1fr 1fr; gap:12px;">
+        <div class="form-group">
+          <label class="form-label">Tags (comma-separated)</label>
+          <input type="text" class="form-input" id="postModalTags" value="${escapeHtml(Array.isArray(post.tags) ? post.tags.join(', ') : '')}" placeholder="thesis, science, essays">
+        </div>
+        <div class="form-group">
+          <label class="form-label">Status</label>
+          <select class="form-select" id="postModalStatus">
+            <option value="published" ${post.status === 'published' ? 'selected' : ''}>Published (Live URL)</option>
+            <option value="draft" ${post.status === 'draft' ? 'selected' : ''}>Draft (Private)</option>
+          </select>
+        </div>
+      </div>
+    `,
+    confirmText: isNew ? 'Save & Preview' : 'Update Story',
+    onConfirm: async () => {
+      const title = document.getElementById('postModalTitle').value.trim() || 'Untitled Story';
+      const slug = document.getElementById('postModalSlug').value.trim().toLowerCase().replace(/[^a-z0-9-]/g, '-') || 'story';
+      const excerpt = document.getElementById('postModalExcerpt').value.trim();
+      const body = document.getElementById('postModalBody').value;
+      const tags = document.getElementById('postModalTags').value.split(',').map(t => t.trim()).filter(Boolean);
+      const status = document.getElementById('postModalStatus').value;
+
+      activeSiteData.posts = activeSiteData.posts || [];
+      const updatedPost = {
+        id: post.id || `post-${Date.now()}`,
+        site_id: activeSiteData.site.id,
+        title,
+        slug,
+        excerpt,
+        body_markdown: body,
+        tags,
+        status,
+        published_at: status === 'published' ? (post.published_at || new Date().toISOString()) : null
+      };
+
+      if (isNew) {
+        activeSiteData.posts.unshift(updatedPost);
+      } else {
+        activeSiteData.posts[postIdx] = updatedPost;
+      }
+
+      await saveSitePosts(activeSiteData.site.id, activeSiteData.posts);
+      renderBlogContentTab(parentPanel);
+      previewPath = `/blog/${slug}`;
+      updateLivePreview();
+      showToast('Story saved and preview loaded.', 'success');
+    }
+  });
+
+  // Auto-slug generator on title input
+  setTimeout(() => {
+    const titleInp = document.getElementById('postModalTitle');
+    const slugInp = document.getElementById('postModalSlug');
+    const mirror = document.getElementById('slugMirror');
+    if (titleInp && slugInp) {
+      if (isNew) {
+        titleInp.addEventListener('input', () => {
+          const s = titleInp.value.toLowerCase().replace(/[^a-z0-9-]/g, '-').replace(/-+/g, '-').slice(0, 32);
+          slugInp.value = s;
+          if (mirror) mirror.textContent = s;
+        });
+      }
+      slugInp.addEventListener('input', () => {
+        if (mirror) mirror.textContent = slugInp.value;
+      });
+    }
+  }, 50);
+}
+
+// ------------------------------------------------------------------------------
+// 1B. PORTFOLIO & LANDING CONTENT TAB (SECTIONS)
+// ------------------------------------------------------------------------------
+function renderPortfolioContentTab(panel) {
   const site = activeSiteData.site;
   const content = site.content || {};
   const hero = content.hero || {};
@@ -352,10 +713,10 @@ function renderContentTab(panel) {
     </div>
   `;
 
-  attachContentEventListeners(panel);
+  attachPortfolioContentEventListeners(panel);
 }
 
-function attachContentEventListeners(panel) {
+function attachPortfolioContentEventListeners(panel) {
   const content = activeSiteData.site.content || {};
 
   // Hero inputs
@@ -364,6 +725,8 @@ function attachContentEventListeners(panel) {
     headlineInput.addEventListener('input', (e) => {
       content.hero = content.hero || {};
       content.hero.headline = e.target.value;
+      activeSiteData.site.title = e.target.value;
+      document.getElementById('siteTitleDisplay').textContent = e.target.value;
       scheduleDraftSave();
     });
   }
@@ -398,7 +761,7 @@ function attachContentEventListeners(panel) {
     ctaUrlInput.addEventListener('input', updateCta);
   }
 
-  // Avatar file upload
+  // Avatar upload
   const avatarFile = panel.querySelector('#heroAvatarFile');
   if (avatarFile) {
     avatarFile.addEventListener('change', async (e) => {
@@ -438,7 +801,7 @@ function attachContentEventListeners(panel) {
       content.skills = content.skills || [];
       content.skills.push({ name: val });
       skillInput.value = '';
-      renderContentTab(panel);
+      renderPortfolioContentTab(panel);
       scheduleDraftSave();
     });
   }
@@ -447,7 +810,7 @@ function attachContentEventListeners(panel) {
     btn.addEventListener('click', () => {
       const idx = parseInt(btn.getAttribute('data-idx'), 10);
       content.skills.splice(idx, 1);
-      renderContentTab(panel);
+      renderPortfolioContentTab(panel);
       scheduleDraftSave();
     });
   });
@@ -464,7 +827,7 @@ function attachContentEventListeners(panel) {
         liveUrl: '',
         githubUrl: ''
       });
-      renderContentTab(panel);
+      renderPortfolioContentTab(panel);
       scheduleDraftSave();
     });
   }
@@ -473,7 +836,7 @@ function attachContentEventListeners(panel) {
     btn.addEventListener('click', () => {
       const idx = parseInt(btn.getAttribute('data-idx'), 10);
       content.projects.splice(idx, 1);
-      renderContentTab(panel);
+      renderPortfolioContentTab(panel);
       scheduleDraftSave();
     });
   });
@@ -529,7 +892,7 @@ function attachContentEventListeners(panel) {
         period: '2024 - Present',
         description: 'Details about your responsibilities.'
       });
-      renderContentTab(panel);
+      renderPortfolioContentTab(panel);
       scheduleDraftSave();
     });
   }
@@ -538,7 +901,7 @@ function attachContentEventListeners(panel) {
     btn.addEventListener('click', () => {
       const idx = parseInt(btn.getAttribute('data-idx'), 10);
       content.experience.splice(idx, 1);
-      renderContentTab(panel);
+      renderPortfolioContentTab(panel);
       scheduleDraftSave();
     });
   });
@@ -554,7 +917,7 @@ function attachContentEventListeners(panel) {
         year: '2020 - 2024',
         details: ''
       });
-      renderContentTab(panel);
+      renderPortfolioContentTab(panel);
       scheduleDraftSave();
     });
   }
@@ -563,14 +926,14 @@ function attachContentEventListeners(panel) {
     btn.addEventListener('click', () => {
       const idx = parseInt(btn.getAttribute('data-idx'), 10);
       content.education.splice(idx, 1);
-      renderContentTab(panel);
+      renderPortfolioContentTab(panel);
       scheduleDraftSave();
     });
   });
 }
 
 // ------------------------------------------------------------------------------
-// 2. PAGES TAB (MULTI-PAGE MANAGEMENT)
+// 2. PAGES TAB (FOR PORTFOLIO / LANDING WEBSITES)
 // ------------------------------------------------------------------------------
 function renderPagesTab(panel) {
   const pages = activeSiteData.pages || [];
@@ -578,44 +941,44 @@ function renderPagesTab(panel) {
   panel.innerHTML = `
     <div style="margin-bottom:20px;">
       <h3 style="font-size:16px; font-weight:700; margin-bottom:4px;">Website Pages</h3>
-      <p style="font-size:13px; color:var(--text-muted); line-height:1.5;">Sites begin as a clean single-page site. Add distinct pages here when you need structured routes like /about or /projects.</p>
+      <p style="font-size:13px; color:var(--text-muted); line-height:1.5;">Add distinct pages when you need structured multi-page routes like /about or /projects.</p>
     </div>
 
-    <div class="card" style="margin-bottom:20px;">
-      <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;">
-        <span style="font-weight:700; font-size:14px;">Home (Single-page root)</span>
-        <span class="badge badge-published">Default</span>
+    <div class="card" style="margin-bottom:16px; padding:16px; background:#ffffff; border:1px solid var(--line); border-radius:12px;">
+      <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:4px;">
+        <span style="font-weight:700; font-size:14px; color:var(--ink);">Home</span>
+        <span class="badge badge-published" style="font-size:10px; padding:2px 7px;">Default</span>
       </div>
-      <div style="font-size:12px; font-family:var(--font-mono); color:var(--text-dim);">Path: /</div>
+      <div style="font-size:12px; font-family:var(--font-mono); color:var(--muted);">Path: /</div>
     </div>
 
     <div class="repeater-list" id="pagesList">
       ${pages.map((p, idx) => `
-        <div class="card" style="margin-bottom:12px; padding:16px;">
+        <div class="card" style="margin-bottom:12px; padding:16px; background:#ffffff; border:1px solid var(--line); border-radius:12px;">
           <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
-            <span style="font-weight:700; font-size:14px; color:#fff;">${escapeHtml(p.title)}</span>
-            <button class="icon-btn btn-delete-page" data-idx="${idx}">&times;</button>
+            <span style="font-weight:700; font-size:14px; color:var(--ink);">${escapeHtml(p.title)}</span>
+            <button class="icon-btn btn-delete-page" data-idx="${idx}" title="Delete page">&times;</button>
           </div>
           <div style="display:flex; justify-content:space-between; align-items:center; font-size:12px;">
-            <span style="font-family:var(--font-mono); color:var(--accent-cyan);">${escapeHtml(p.path)}</span>
-            <button class="btn btn-outline btn-sm btn-preview-page" data-path="${p.path}">Preview Page</button>
+            <span style="font-family:var(--font-mono); color:var(--ink); font-weight:600;">${escapeHtml(p.path)}</span>
+            <button class="btn btn-outline btn-sm btn-preview-page" data-path="${escapeHtml(p.path)}" style="padding:3px 10px; font-size:11px;">Preview</button>
           </div>
         </div>
       `).join('')}
     </div>
 
-    <button class="btn btn-primary btn-sm" id="btnModalAddPage" style="width:100%;">+ Add Page</button>
+    <button class="btn btn-primary btn-sm" id="btnAddPage" style="width:100%; margin-top:8px;">+ Add New Page</button>
   `;
 
-  // Add Page Modal
-  panel.querySelector('#btnModalAddPage').addEventListener('click', () => {
+  // Add Page handler
+  panel.querySelector('#btnAddPage').addEventListener('click', () => {
     openModal({
-      title: 'Add Predefined Page',
+      title: 'Create New Page',
       contentHtml: `
         <div class="form-group">
-          <label class="form-label">Predefined Page Type</label>
+          <label class="form-label">Page Type</label>
           <select class="form-select" id="modalPageType">
-            <option value="about">About (/about)</option>
+            <option value="about">About Me (/about)</option>
             <option value="projects">Projects Showcase (/projects)</option>
             <option value="services">Services (/services)</option>
             <option value="contact">Contact (/contact)</option>
@@ -649,7 +1012,9 @@ function renderPagesTab(panel) {
           is_published: true
         });
 
+        await saveSitePages(activeSiteData.site.id, activeSiteData.pages);
         renderPagesTab(panel);
+        previewPath = path;
         updateLivePreview();
         showToast(`Created page ${path}`, 'success');
       }
@@ -678,7 +1043,9 @@ function renderPagesTab(panel) {
     btn.addEventListener('click', () => {
       const idx = parseInt(btn.getAttribute('data-idx'), 10);
       activeSiteData.pages.splice(idx, 1);
+      saveSitePages(activeSiteData.site.id, activeSiteData.pages);
       renderPagesTab(panel);
+      previewPath = '/';
       updateLivePreview();
       showToast('Page removed.', 'info');
     });
@@ -694,156 +1061,12 @@ function renderPagesTab(panel) {
 }
 
 // ------------------------------------------------------------------------------
-// 3. BLOG TAB
-// ------------------------------------------------------------------------------
-function renderBlogTab(panel) {
-  const posts = activeSiteData.posts || [];
-
-  panel.innerHTML = `
-    <div style="margin-bottom:20px;">
-      <h3 style="font-size:16px; font-weight:700; margin-bottom:4px;">Articles & Blog Posts</h3>
-      <p style="font-size:13px; color:var(--text-muted); line-height:1.5;">Publish articles at /blog and /blog/[post-slug].</p>
-    </div>
-
-    <div class="repeater-list" id="postsList">
-      ${posts.length === 0 ? '<div style="color:var(--text-dim); font-size:13px; padding:16px 0;">No blog posts created yet.</div>' : ''}
-      ${posts.map((post, idx) => `
-        <div class="card" style="margin-bottom:12px; padding:16px;">
-          <div style="display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:8px;">
-            <div>
-              <span class="badge ${post.status === 'published' ? 'badge-published' : 'badge-draft'}" style="margin-bottom:4px;">${post.status}</span>
-              <h4 style="font-size:15px; font-weight:700; color:#fff;">${escapeHtml(post.title)}</h4>
-            </div>
-            <button class="icon-btn btn-delete-post" data-idx="${idx}">&times;</button>
-          </div>
-          <div style="font-family:var(--font-mono); font-size:12px; color:var(--text-dim); margin-bottom:12px;">/blog/${escapeHtml(post.slug)}</div>
-          <div style="display:flex; gap:8px;">
-            <button class="btn btn-secondary btn-sm btn-edit-post" data-idx="${idx}">Edit Article</button>
-            <button class="btn btn-outline btn-sm btn-view-post" data-slug="${post.slug}">Preview</button>
-          </div>
-        </div>
-      `).join('')}
-    </div>
-
-    <button class="btn btn-primary btn-sm" id="btnCreatePost" style="width:100%;">+ Write New Article</button>
-  `;
-
-  // Create article button
-  panel.querySelector('#btnCreatePost').addEventListener('click', () => {
-    openPostEditor(null, panel);
-  });
-
-  // Edit article button
-  panel.querySelectorAll('.btn-edit-post').forEach(btn => {
-    btn.addEventListener('click', () => {
-      const idx = parseInt(btn.getAttribute('data-idx'), 10);
-      openPostEditor(idx, panel);
-    });
-  });
-
-  // Delete article button
-  panel.querySelectorAll('.btn-delete-post').forEach(btn => {
-    btn.addEventListener('click', () => {
-      const idx = parseInt(btn.getAttribute('data-idx'), 10);
-      activeSiteData.posts.splice(idx, 1);
-      renderBlogTab(panel);
-      updateLivePreview();
-      showToast('Article deleted.', 'info');
-    });
-  });
-
-  // Preview article button
-  panel.querySelectorAll('.btn-view-post').forEach(btn => {
-    btn.addEventListener('click', () => {
-      previewPath = `/blog/${btn.getAttribute('data-slug')}`;
-      updateLivePreview();
-    });
-  });
-}
-
-function openPostEditor(postIdx, parentPanel) {
-  const isNew = postIdx === null;
-  const post = !isNew ? activeSiteData.posts[postIdx] : {
-    title: 'My New Article',
-    slug: 'my-new-article',
-    excerpt: 'A brief summary of this article.',
-    body_markdown: '# My Article\n\nWrite your thoughts here...',
-    status: 'draft'
-  };
-
-  openModal({
-    title: isNew ? 'Create New Article' : 'Edit Article',
-    contentHtml: `
-      <div class="form-group">
-        <label class="form-label">Article Title</label>
-        <input type="text" class="form-input" id="postModalTitle" value="${escapeHtml(post.title)}">
-      </div>
-      <div class="form-group">
-        <label class="form-label">Slug (URL identifier)</label>
-        <input type="text" class="form-input" id="postModalSlug" value="${escapeHtml(post.slug)}">
-      </div>
-      <div class="form-group">
-        <label class="form-label">Excerpt / Summary</label>
-        <textarea class="form-textarea" rows="2" id="postModalExcerpt">${escapeHtml(post.excerpt || '')}</textarea>
-      </div>
-      <div class="form-group">
-        <label class="form-label">Article Body (Markdown)</label>
-        <textarea class="form-textarea" rows="8" id="postModalBody">${escapeHtml(post.body_markdown || '')}</textarea>
-      </div>
-      <div class="form-group">
-        <label class="form-label">Publication Status</label>
-        <select class="form-select" id="postModalStatus">
-          <option value="draft" ${post.status === 'draft' ? 'selected' : ''}>Draft (Private)</option>
-          <option value="published" ${post.status === 'published' ? 'selected' : ''}>Published</option>
-        </select>
-      </div>
-    `,
-    confirmText: isNew ? 'Save Article' : 'Update Article',
-    onConfirm: async () => {
-      const title = document.getElementById('postModalTitle').value.trim();
-      const slug = document.getElementById('postModalSlug').value.trim().toLowerCase().replace(/[^a-z0-9-]/g, '-');
-      const excerpt = document.getElementById('postModalExcerpt').value.trim();
-      const body = document.getElementById('postModalBody').value;
-      const status = document.getElementById('postModalStatus').value;
-
-      activeSiteData.posts = activeSiteData.posts || [];
-      if (isNew) {
-        activeSiteData.posts.unshift({
-          id: `post-${Date.now()}`,
-          site_id: activeSiteData.site.id,
-          title,
-          slug,
-          excerpt,
-          body_markdown: body,
-          status,
-          published_at: status === 'published' ? new Date().toISOString() : null
-        });
-      } else {
-        activeSiteData.posts[postIdx] = {
-          ...activeSiteData.posts[postIdx],
-          title,
-          slug,
-          excerpt,
-          body_markdown: body,
-          status,
-          published_at: status === 'published' ? (activeSiteData.posts[postIdx].published_at || new Date().toISOString()) : null
-        };
-      }
-
-      renderBlogTab(parentPanel);
-      updateLivePreview();
-      showToast('Article saved.', 'success');
-    }
-  });
-}
-
-// ------------------------------------------------------------------------------
-// 4. DESIGN & THEME TAB
+// 3. DESIGN & THEME TAB
 // ------------------------------------------------------------------------------
 function renderDesignTab(panel) {
   const site = activeSiteData.site;
   const theme = site.theme_config || {};
-  const currentAccent = theme.primaryColor || '#2563eb';
+  const currentAccent = theme.primaryColor || '#111827';
   const currentFont = theme.fontPair || 'inter-outfit';
 
   panel.innerHTML = `
@@ -871,7 +1094,7 @@ function renderDesignTab(panel) {
         <input type="text" class="form-input" id="primaryColorText" value="${currentAccent}" style="font-family:var(--font-mono); width:120px;">
       </div>
       <div style="display:flex; gap:8px; flex-wrap:wrap;">
-        ${['#2563eb', '#10b981', '#1e3a8a', '#0f766e', '#ec4899', '#6366f1', '#b45309', '#0284c7', '#111827'].map(c => `
+        ${['#111827', '#2563eb', '#10b981', '#1e3a8a', '#0f766e', '#ec4899', '#6366f1', '#b45309', '#0284c7'].map(c => `
           <button class="color-preset-btn" data-color="${c}" style="width:28px; height:28px; border-radius:50%; background:${c}; border:2px solid ${c === currentAccent ? '#fff' : 'transparent'}; cursor:pointer;"></button>
         `).join('')}
       </div>
@@ -904,24 +1127,27 @@ function renderDesignTab(panel) {
     updateLivePreview();
   });
 
-  // Color picker
-  const colPicker = panel.querySelector('#primaryColorPicker');
-  const colText = panel.querySelector('#primaryColorText');
-  const updateColor = (color) => {
-    colPicker.value = color;
-    colText.value = color;
+  // Color inputs
+  const colorPicker = panel.querySelector('#primaryColorPicker');
+  const colorText = panel.querySelector('#primaryColorText');
+
+  const updateColor = (hex) => {
     site.theme_config = site.theme_config || {};
-    site.theme_config.primaryColor = color;
+    site.theme_config.primaryColor = hex;
+    colorPicker.value = hex;
+    colorText.value = hex;
     scheduleDraftSave();
     updateLivePreview();
   };
-  colPicker.addEventListener('input', (e) => updateColor(e.target.value));
-  colText.addEventListener('input', (e) => updateColor(e.target.value));
+
+  colorPicker.addEventListener('input', (e) => updateColor(e.target.value));
+  colorText.addEventListener('change', (e) => updateColor(e.target.value));
+
   panel.querySelectorAll('.color-preset-btn').forEach(btn => {
     btn.addEventListener('click', () => updateColor(btn.getAttribute('data-color')));
   });
 
-  // Font change
+  // Font pair change
   panel.querySelector('#fontPairPicker').addEventListener('change', (e) => {
     site.theme_config = site.theme_config || {};
     site.theme_config.fontPair = e.target.value;
@@ -929,269 +1155,245 @@ function renderDesignTab(panel) {
     updateLivePreview();
   });
 
-  // Logo upload
-  panel.querySelector('#logoUploadFile').addEventListener('change', async (e) => {
-    const file = e.target.files[0];
-    if (!file) return;
-    try {
-      showToast('Uploading logo...', 'info');
-      const res = await uploadAsset(file, site.id, 'logo');
+  // Logo file upload
+  const logoFile = panel.querySelector('#logoUploadFile');
+  if (logoFile) {
+    logoFile.addEventListener('change', async (e) => {
+      const file = e.target.files[0];
+      if (!file) return;
+      try {
+        showToast('Uploading logo...', 'info');
+        const res = await uploadAsset(file, site.id, 'image');
+        site.theme_config = site.theme_config || {};
+        site.theme_config.logoUrl = res.publicUrl;
+        panel.querySelector('#logoUrlInput').value = res.publicUrl;
+        showToast('Logo uploaded!', 'success');
+        scheduleDraftSave();
+        updateLivePreview();
+      } catch (err) {
+        showToast(err.message, 'error');
+      }
+    });
+  }
+
+  const logoUrlInput = panel.querySelector('#logoUrlInput');
+  if (logoUrlInput) {
+    logoUrlInput.addEventListener('input', (e) => {
       site.theme_config = site.theme_config || {};
-      site.theme_config.logoUrl = res.publicUrl;
-      panel.querySelector('#logoUrlInput').value = res.publicUrl;
-      showToast('Logo uploaded!', 'success');
+      site.theme_config.logoUrl = e.target.value;
       scheduleDraftSave();
       updateLivePreview();
-    } catch (err) {
-      showToast(err.message, 'error');
-    }
-  });
-}
-
-// ------------------------------------------------------------------------------
-// 5. SUBDOMAIN & PUBLISH TAB
-// ------------------------------------------------------------------------------
-function renderPublishTab(panel) {
-  const site = activeSiteData.site;
-  const isPub = site.status === 'published';
-  const pubUrl = `https://${site.subdomain_slug}.${CONFIG.PLATFORM_DOMAIN}`;
-
-  panel.innerHTML = `
-    <div style="margin-bottom:20px;">
-      <h3 style="font-size:16px; font-weight:700; margin-bottom:4px;">Subdomain & Publishing</h3>
-      <p style="font-size:13px; color:var(--text-muted); line-height:1.5;">Every website receives its own unique subdomain under ${CONFIG.PLATFORM_DOMAIN}.</p>
-    </div>
-
-    <!-- Subdomain Selector -->
-    <div class="form-group">
-      <label class="form-label">Choose Your Subdomain</label>
-      <div class="subdomain-input-group">
-        <span class="subdomain-prefix">https://</span>
-        <input type="text" class="subdomain-input" id="subdomainSlugInput" value="${escapeHtml(site.subdomain_slug)}" maxlength="32">
-        <span class="subdomain-suffix">.${CONFIG.PLATFORM_DOMAIN}</span>
-      </div>
-      <div class="status-badge" id="subdomainStatusIndicator">
-        <span class="status-available">✓ Valid format</span>
-      </div>
-    </div>
-
-    <!-- Publication Status Box -->
-    <div class="card" style="margin-bottom:24px; padding:20px;">
-      <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;">
-        <span style="font-weight:700;">Status</span>
-        <span class="badge ${isPub ? 'badge-published' : 'badge-draft'}">
-          <span class="badge-dot"></span>
-          ${site.status}
-        </span>
-      </div>
-
-      ${isPub ? `
-        <div style="margin-bottom:16px;">
-          <div style="font-size:12px; color:var(--text-dim); margin-bottom:4px;">Live URL:</div>
-          <a href="${pubUrl}" target="_blank" rel="noopener" style="font-family:var(--font-mono); font-size:14px; color:var(--accent-cyan); word-break:break-all;">
-            ${pubUrl} ↗
-          </a>
-        </div>
-      ` : `
-        <p style="font-size:13px; color:var(--text-muted); margin-bottom:16px;">
-          Your website is currently in draft mode. Click Publish below to make it visible to the world.
-        </p>
-      `}
-
-      <div style="display:flex; gap:10px; flex-wrap:wrap;">
-        <button class="btn btn-primary" id="btnPublishSite" style="flex:1;">
-          ${isPub ? 'Republish Changes' : 'Publish Website Now'}
-        </button>
-        ${isPub ? `<button class="btn btn-outline" id="btnUnpublishSite">Unpublish</button>` : ''}
-      </div>
-    </div>
-
-    <!-- Pre-publish Checklist -->
-    <div style="font-size:13px; color:var(--text-muted); line-height:1.6;">
-      <div style="font-weight:700; color:#fff; margin-bottom:8px;">Pre-Publish Verification:</div>
-      <div>✓ Subdomain uniqueness enforced</div>
-      <div>✓ Standalone semantic HTML (zero React runtime)</div>
-      <div>✓ Automatic /robots.txt, /sitemap.xml, and /llms.txt included</div>
-    </div>
-  `;
-
-  // Subdomain live availability check
-  const slugInput = panel.querySelector('#subdomainSlugInput');
-  const statusEl = panel.querySelector('#subdomainStatusIndicator');
-
-  slugInput.addEventListener('input', (e) => {
-    clearTimeout(availabilityTimer);
-    const rawVal = e.target.value.toLowerCase().trim();
-    statusEl.innerHTML = `<span class="status-checking">Checking availability...</span>`;
-
-    availabilityTimer = setTimeout(async () => {
-      const avail = await checkSubdomainAvailability(rawVal, site.id);
-      if (avail.available) {
-        statusEl.innerHTML = `<span class="status-available">✓ <strong>${avail.slug}.${CONFIG.PLATFORM_DOMAIN}</strong> is available</span>`;
-        site.subdomain_slug = avail.slug;
-        scheduleDraftSave();
-      } else {
-        statusEl.innerHTML = `<span class="status-taken">✕ ${avail.reason}</span>`;
-      }
-    }, 400);
-  });
-
-  // Publish button
-  panel.querySelector('#btnPublishSite').addEventListener('click', async () => {
-    const btn = panel.querySelector('#btnPublishSite');
-    btn.disabled = true;
-    btn.textContent = 'Publishing...';
-    try {
-      const res = await publishSite(site.id, slugInput.value);
-      site.status = 'published';
-      site.subdomain_slug = res.subdomain;
-      showToast('Website published successfully!', 'success');
-      renderPublishTab(panel);
-      updateLivePreview();
-    } catch (err) {
-      showToast(err.message, 'error');
-      btn.disabled = false;
-      btn.textContent = isPub ? 'Republish Changes' : 'Publish Website Now';
-    }
-  });
-
-  // Unpublish button
-  const unpubBtn = panel.querySelector('#btnUnpublishSite');
-  if (unpubBtn) {
-    unpubBtn.addEventListener('click', async () => {
-      openModal({
-        title: 'Unpublish Website?',
-        contentHtml: `<p>Your website will be immediately taken offline. Your saved content and drafts will remain intact.</p>`,
-        confirmText: 'Unpublish',
-        isDanger: true,
-        onConfirm: async () => {
-          try {
-            await unpublishSite(site.id);
-            site.status = 'unpublished';
-            showToast('Website unpublished.', 'info');
-            renderPublishTab(panel);
-            updateLivePreview();
-          } catch (err) {
-            showToast(err.message, 'error');
-          }
-        }
-      });
     });
   }
 }
 
 // ------------------------------------------------------------------------------
-// 6. INBOX TAB (CONTACT MESSAGES)
+// 4. PUBLISH MODAL
 // ------------------------------------------------------------------------------
-async function renderInboxTab(panel) {
-  panel.innerHTML = `<div style="color:var(--text-muted); font-size:13px;">Loading messages...</div>`;
+function openPublishModal(container) {
+  const site = activeSiteData.site;
+  const isPub = site.status === 'published';
+  let availabilityTimer = null;
 
-  try {
-    const messages = await getContactMessages(activeSiteData.site.id);
-
-    panel.innerHTML = `
+  const modal = openModal({
+    title: isPub ? 'Republish Website' : 'Publish Website Online',
+    contentHtml: `
       <div style="margin-bottom:20px;">
-        <h3 style="font-size:16px; font-weight:700; margin-bottom:4px;">Contact Form Inbox (${messages.length})</h3>
-        <p style="font-size:13px; color:var(--text-muted); line-height:1.5;">Messages submitted by public visitors through your website's contact form.</p>
+        <p style="font-size:14px; color:var(--muted); line-height:1.5;">
+          Your website will be published with instant edge routing on Cloudflare.
+        </p>
       </div>
 
-      <div class="repeater-list">
-        ${messages.length === 0 ? '<div class="card" style="text-align:center; padding:32px; color:var(--text-muted);">No messages received yet.</div>' : ''}
-        ${messages.map(m => {
-          const dateStr = new Date(m.created_at).toLocaleDateString('en-US', {
-            month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit'
-          });
-          return `
-            <div class="card" style="margin-bottom:14px; padding:18px;">
-              <div style="display:flex; justify-content:space-between; align-items:baseline; margin-bottom:6px;">
-                <span style="font-weight:700; color:#fff; font-size:15px;">${escapeHtml(m.sender_name)}</span>
-                <span style="font-size:12px; color:var(--text-dim);">${dateStr}</span>
-              </div>
-              <div style="font-size:13px; color:var(--accent-cyan); margin-bottom:10px;">
-                <a href="mailto:${escapeHtml(m.sender_email)}">${escapeHtml(m.sender_email)}</a>
-              </div>
-              <p style="font-size:14px; color:var(--text-main); line-height:1.6; background:rgba(0,0,0,0.25); padding:12px; border-radius:6px;">
-                ${escapeHtml(m.message)}
-              </p>
-            </div>
-          `;
-        }).join('')}
+      <div class="form-group">
+        <label class="form-label">Subdomain Address</label>
+        <div class="subdomain-input-group">
+          <span class="subdomain-prefix">https://</span>
+          <input type="text" class="subdomain-input" id="modalSubdomainSlug" value="${site.subdomain_slug}" maxlength="32">
+          <span class="subdomain-suffix">.${CONFIG.PLATFORM_DOMAIN}</span>
+        </div>
+        <div id="modalSubdomainStatus" style="font-size:12px; margin-top:8px; color:var(--muted);">
+          Letters, numbers, and hyphens only (3-32 characters).
+        </div>
       </div>
-    `;
-  } catch (err) {
-    panel.innerHTML = `<div style="color:var(--accent-rose);">Failed loading inbox messages.</div>`;
+
+      ${isPub ? `
+        <div style="padding:14px 16px; background:var(--paper-soft); border:1px solid var(--line); border-radius:10px; margin-bottom:20px; font-size:13px;">
+          <div style="font-weight:600; color:var(--ink); margin-bottom:4px;">Live URL:</div>
+          <a href="https://${site.subdomain_slug}.${CONFIG.PLATFORM_DOMAIN}" target="_blank" rel="noopener" style="font-family:var(--font-mono); color:var(--ink); font-weight:600; text-decoration:underline;">
+            https://${site.subdomain_slug}.${CONFIG.PLATFORM_DOMAIN} ↗
+          </a>
+        </div>
+      ` : ''}
+
+      <div style="font-size:13px; color:var(--muted); line-height:1.6; margin-bottom:24px;">
+        <div style="font-weight:700; color:var(--ink); margin-bottom:6px;">Features included:</div>
+        <div>✓ Subdomain uniqueness guaranteed</div>
+        <div>✓ Standalone semantic HTML (zero framework runtime bloat)</div>
+        <div>✓ Automatic /robots.txt, /sitemap.xml, and /llms.txt included</div>
+      </div>
+
+      <div style="display:flex; justify-content:space-between; align-items:center; gap:12px; flex-wrap:wrap;">
+        ${isPub ? `
+          <button class="btn btn-outline btn-sm" id="modalBtnUnpublish" style="color:var(--accent-rose);">Unpublish Site</button>
+        ` : '<div></div>'}
+        <button class="btn btn-primary" id="modalBtnConfirmPublish" style="padding:10px 24px;">
+          ${isPub ? 'Republish Changes' : 'Publish Website Now'}
+        </button>
+      </div>
+    `,
+    cancelText: 'Close'
+  });
+
+  const slugInput = document.getElementById('modalSubdomainSlug');
+  const statusEl = document.getElementById('modalSubdomainStatus');
+  const publishBtn = document.getElementById('modalBtnConfirmPublish');
+  const unpublishBtn = document.getElementById('modalBtnUnpublish');
+
+  if (slugInput) {
+    slugInput.addEventListener('input', (e) => {
+      clearTimeout(availabilityTimer);
+      const rawVal = e.target.value.toLowerCase().trim();
+      statusEl.innerHTML = `<span style="color:var(--muted);">Checking availability...</span>`;
+
+      availabilityTimer = setTimeout(async () => {
+        const avail = await checkSubdomainAvailability(rawVal, site.id);
+        if (avail.available) {
+          statusEl.innerHTML = `<span style="color:var(--accent-emerald);">✓ <strong>${avail.slug}.${CONFIG.PLATFORM_DOMAIN}</strong> is available</span>`;
+          site.subdomain_slug = avail.slug;
+          scheduleDraftSave();
+        } else {
+          statusEl.innerHTML = `<span style="color:var(--accent-rose);">✕ ${avail.reason}</span>`;
+        }
+      }, 350);
+    });
+  }
+
+  if (publishBtn) {
+    publishBtn.addEventListener('click', async () => {
+      publishBtn.disabled = true;
+      publishBtn.textContent = 'Publishing...';
+      try {
+        const res = await publishSite(site.id, slugInput.value.trim().toLowerCase());
+        site.status = 'published';
+        site.subdomain_slug = res.subdomain;
+        showToast('Website published successfully!', 'success');
+        modal.close();
+        document.getElementById('btnQuickPublish').textContent = 'Republish';
+        updateLivePreview();
+      } catch (err) {
+        showToast(err.message, 'error');
+        publishBtn.disabled = false;
+        publishBtn.textContent = isPub ? 'Republish Changes' : 'Publish Website Now';
+      }
+    });
+  }
+
+  if (unpublishBtn) {
+    unpublishBtn.addEventListener('click', async () => {
+      try {
+        await unpublishSite(site.id);
+        site.status = 'unpublished';
+        showToast('Website unpublished.', 'info');
+        modal.close();
+        document.getElementById('btnQuickPublish').textContent = 'Publish';
+        updateLivePreview();
+      } catch (err) {
+        showToast(err.message, 'error');
+      }
+    });
   }
 }
 
 // ------------------------------------------------------------------------------
-// 7. SETTINGS & SEO TAB
+// 5. SETTINGS & SEO MODAL
 // ------------------------------------------------------------------------------
-function renderSettingsTab(panel) {
+function openSettingsModal(container) {
   const site = activeSiteData.site;
   const seo = site.seo_config || {};
 
-  panel.innerHTML = `
-    <div style="margin-bottom:20px;">
-      <h3 style="font-size:16px; font-weight:700; margin-bottom:4px;">Settings & SEO</h3>
-      <p style="font-size:13px; color:var(--text-muted); line-height:1.5;">Configure search engine metadata, social share previews, and general settings.</p>
-    </div>
+  const modal = openModal({
+    title: 'Site Settings & SEO',
+    contentHtml: `
+      <div class="form-group">
+        <label class="form-label">Website Title</label>
+        <input type="text" class="form-input" id="settingModalTitle" value="${escapeHtml(site.title)}">
+      </div>
 
-    <div class="form-group">
-      <label class="form-label">Website Title</label>
-      <input type="text" class="form-input" id="settingSiteTitle" value="${escapeHtml(site.title)}">
-    </div>
+      <div class="form-group">
+        <label class="form-label">Website Type</label>
+        <select class="form-select" id="settingModalType">
+          <option value="portfolio" ${site.site_type === 'portfolio' ? 'selected' : ''}>Portfolio Website</option>
+          <option value="blog" ${site.site_type === 'blog' ? 'selected' : ''}>Writing & Blog (Thesis, Story, Articles)</option>
+          <option value="business" ${site.site_type === 'business' ? 'selected' : ''}>Landing Page</option>
+        </select>
+        <div class="form-hint">Controls the studio tabs: Blog shows Content & Design; Portfolio/Landing shows Content, Pages, and Design.</div>
+      </div>
 
-    <div class="form-group">
-      <label class="form-label">SEO Meta Description</label>
-      <textarea class="form-textarea" rows="3" id="settingMetaDesc" placeholder="Brief summary for Google search results...">${escapeHtml(seo.metaDescription || site.description || '')}</textarea>
-    </div>
+      <div class="form-group">
+        <label class="form-label">SEO Meta Description</label>
+        <textarea class="form-textarea" rows="2" id="settingModalDesc" placeholder="Brief summary for Google search results...">${escapeHtml(seo.metaDescription || site.description || '')}</textarea>
+      </div>
 
-    <div class="form-group" style="display:flex; align-items:center; gap:10px; margin-top:20px;">
-      <input type="checkbox" id="settingDiscourage" ${seo.discourageSearch ? 'checked' : ''} style="width:18px; height:18px; cursor:pointer;">
-      <label for="settingDiscourage" style="font-size:13px; font-weight:600; cursor:pointer;">
-        Discourage search engine indexing (adds noindex directive)
-      </label>
-    </div>
+      <div class="form-group" style="display:flex; align-items:center; gap:10px; margin-top:16px;">
+        <input type="checkbox" id="settingModalDiscourage" ${seo.discourageSearch ? 'checked' : ''} style="width:16px; height:16px; cursor:pointer;">
+        <label for="settingModalDiscourage" style="font-size:13px; color:var(--ink); cursor:pointer;">
+          Discourage search engines from indexing this site
+        </label>
+      </div>
 
-    <!-- Danger Zone: Delete Site -->
-    <div style="margin-top:40px; padding-top:24px; border-top:1px solid rgba(244, 63, 94, 0.3);">
-      <h4 style="color:#fda4af; font-size:14px; font-weight:700; margin-bottom:8px;">Danger Zone</h4>
-      <p style="font-size:12px; color:var(--text-dim); margin-bottom:14px;">Deleting this website will permanently remove all pages, blog posts, and associated files.</p>
-      <button class="btn btn-danger btn-sm" id="btnDeleteSiteStudio">Delete This Website</button>
-    </div>
-  `;
-
-  panel.querySelector('#settingSiteTitle').addEventListener('input', (e) => {
-    site.title = e.target.value;
-    document.getElementById('siteTitleDisplay').textContent = e.target.value;
-    scheduleDraftSave();
-    updateLivePreview();
+      <div style="margin-top:24px; padding-top:18px; border-top:1px solid var(--line-subtle); display:flex; justify-content:space-between; align-items:center;">
+        <button class="btn btn-outline btn-sm" id="settingModalDelete" style="color:var(--accent-rose);">Delete Website</button>
+        <button class="btn btn-primary btn-sm" id="settingModalSave">Save Settings</button>
+      </div>
+    `,
+    cancelText: 'Close'
   });
 
-  panel.querySelector('#settingMetaDesc').addEventListener('input', (e) => {
+  document.getElementById('settingModalSave')?.addEventListener('click', async () => {
+    const newTitle = document.getElementById('settingModalTitle').value.trim();
+    const newType = document.getElementById('settingModalType').value;
+    const newDesc = document.getElementById('settingModalDesc').value.trim();
+    const discourage = document.getElementById('settingModalDiscourage').checked;
+
+    const typeChanged = site.site_type !== newType;
+    site.title = newTitle;
+    site.site_type = newType;
+    site.description = newDesc;
     site.seo_config = site.seo_config || {};
-    site.seo_config.metaDescription = e.target.value;
-    scheduleDraftSave();
+    site.seo_config.metaDescription = newDesc;
+    site.seo_config.discourageSearch = discourage;
+
+    await saveSiteDraft(site.id, {
+      title: newTitle,
+      site_type: newType,
+      description: newDesc,
+      seo_config: site.seo_config
+    });
+
+    document.getElementById('siteTitleDisplay').textContent = newTitle;
+    showToast('Settings saved.', 'success');
+    modal.close();
+
+    if (typeChanged) {
+      renderEditor(container, site.id);
+    } else {
+      updateLivePreview();
+    }
   });
 
-  panel.querySelector('#settingDiscourage').addEventListener('change', (e) => {
-    site.seo_config = site.seo_config || {};
-    site.seo_config.discourageSearch = e.target.checked;
-    scheduleDraftSave();
-    updateLivePreview();
-  });
-
-  panel.querySelector('#btnDeleteSiteStudio').addEventListener('click', () => {
+  document.getElementById('settingModalDelete')?.addEventListener('click', () => {
+    modal.close();
     openModal({
       title: 'Delete Website Permanently?',
-      contentHtml: `<p>Are you sure you want to delete <strong>${escapeHtml(site.title)}</strong>? This action cannot be reversed.</p>`,
+      contentHtml: `<p>Are you sure you want to delete <strong>${escapeHtml(site.title)}</strong>? All content will be permanently removed.</p>`,
       confirmText: 'Delete Permanently',
       isDanger: true,
       onConfirm: async () => {
         try {
           await deleteSite(site.id);
           showToast('Website deleted.', 'success');
-          window.location.hash = '#/dashboard';
+          window.history.pushState(null, '', '/dashboard');
+          window.dispatchEvent(new PopStateEvent('popstate'));
         } catch (err) {
           showToast(err.message, 'error');
         }
@@ -1206,16 +1408,84 @@ function renderSettingsTab(panel) {
 function updateLivePreview() {
   const iframe = document.getElementById('previewFrame');
   const addressSpan = document.getElementById('previewAddress');
+  const homeBtn = document.getElementById('btnPreviewHome');
   if (!iframe || !activeSiteData) return;
 
   const site = activeSiteData.site;
+  const fullPath = previewPath === '/' ? '' : previewPath;
   if (addressSpan) {
-    addressSpan.textContent = `https://${site.subdomain_slug}.${CONFIG.PLATFORM_DOMAIN}${previewPath === '/' ? '' : previewPath}`;
+    addressSpan.textContent = `https://${site.subdomain_slug}.${CONFIG.PLATFORM_DOMAIN}${fullPath}`;
   }
+  if (homeBtn) {
+    homeBtn.style.display = previewPath === '/' ? 'none' : 'inline-flex';
+  }
+
+  // Preserve scroll position to eliminate jumpiness/flicker while editing
+  let scrollY = 0;
+  try {
+    if (iframe.contentWindow) {
+      scrollY = iframe.contentWindow.scrollY || 0;
+    }
+  } catch (e) {}
 
   // Render using shared template engine
   const rendered = renderSite(activeSiteData, previewPath);
-  iframe.srcdoc = rendered.body;
+
+  // Canvas isolation and internal navigation script (strictly contained inside the canvas)
+  const canvasIsolationScript = `
+    <script>
+      (function() {
+        // Intercept all internal navigation to keep preview 100% isolated from MNDO Builder
+        document.addEventListener('click', function(e) {
+          var a = e.target.closest('a');
+          if (!a) return;
+          var href = a.getAttribute('href');
+          if (!href) return;
+
+          // In-page anchor link (e.g. #projects, #contact)
+          if (href.startsWith('#')) {
+            e.preventDefault();
+            var target = document.querySelector(href);
+            if (target) {
+              target.scrollIntoView({ behavior: 'smooth' });
+            }
+            return;
+          }
+
+          // Internal route navigation (/about, /projects, /blog, /blog/...)
+          if (href.startsWith('/')) {
+            e.preventDefault();
+            window.parent.postMessage({ type: 'MNDO_CANVAS_NAVIGATE', path: href }, '*');
+            return;
+          }
+
+          // External links (never allow navigating canvas away to external websites)
+          if (href.startsWith('http://') || href.startsWith('https://')) {
+            a.setAttribute('target', '_blank');
+            a.setAttribute('rel', 'noopener noreferrer');
+          }
+        }, true);
+      })();
+    </script>
+  `;
+
+  let htmlBody = rendered.body;
+  if (htmlBody.includes('</body>')) {
+    htmlBody = htmlBody.replace('</body>', `${canvasIsolationScript}</body>`);
+  } else {
+    htmlBody += canvasIsolationScript;
+  }
+
+  iframe.srcdoc = htmlBody;
+
+  // Restore scroll position after document finishes rendering
+  iframe.onload = () => {
+    try {
+      if (iframe.contentWindow && scrollY > 0) {
+        iframe.contentWindow.scrollTo(0, scrollY);
+      }
+    } catch (e) {}
+  };
 }
 
 function scheduleDraftSave() {

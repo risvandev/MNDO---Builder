@@ -2,7 +2,7 @@
 // MNDO BUILDER - VALIDATION & SUBDOMAIN RULES
 // ==============================================================================
 import { RESERVED_SUBDOMAINS } from '../../worker/src/hostname.js';
-import { getClient } from './supabase.js';
+import { getClient, getMockState } from './supabase.js';
 
 /**
  * Validate a candidate subdomain format.
@@ -87,9 +87,8 @@ export async function checkSubdomainAvailability(slug, currentSiteId = null) {
   }
 
   // Local storage check
-  const raw = localStorage.getItem('mndo_mock_state_v1');
-  if (raw) {
-    const state = JSON.parse(raw);
+  const state = getMockState();
+  if (state) {
     const conflict = state.sites?.find(s => s.subdomain_slug === validation.normalized && s.id !== currentSiteId);
     if (conflict) {
       return { available: false, reason: 'This subdomain is already claimed.', slug: validation.normalized };

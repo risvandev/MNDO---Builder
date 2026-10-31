@@ -129,7 +129,7 @@ export function renderDeveloper(siteData, currentPath = '/') {
         <span class="t-dot t-red"></span>
         <span class="t-dot t-yellow"></span>
         <span class="t-dot t-green"></span>
-        <span class="terminal-title">${escapeHtml(site.subdomain_slug)}.mndo.online &mdash; bash</span>
+        <span class="terminal-title">${escapeHtml(site.subdomain_slug || 'terminal')} &mdash; bash</span>
       </div>
       <div class="terminal-body">
         <div class="t-command"><span class="t-prompt">➜ ~</span> cat introduction.json</div>
@@ -172,14 +172,13 @@ export function renderDeveloper(siteData, currentPath = '/') {
     </section>
     ` : ''}
 
-    ${projects.length > 0 ? `
     <section class="section" id="projects">
       <div class="section-head">
         <span class="section-prompt">03.</span>
-        <h2 class="section-title">Repositories & Projects</h2>
+        <h2 class="section-title">Repositories &amp; Projects</h2>
       </div>
       <div class="projects-grid">
-        ${projects.map(p => `
+        ${projects.length > 0 ? projects.map(p => `
           <div class="project-card">
             <div>
               <h3 class="p-title">${escapeHtml(p.title)}</h3>
@@ -197,19 +196,38 @@ export function renderDeveloper(siteData, currentPath = '/') {
               </div>
             </div>
           </div>
-        `).join('')}
+        `).join('') : `
+          <div class="project-card">
+            <div>
+              <h3 class="p-title">edge-subdomain-router</h3>
+              <p class="p-desc">High-velocity edge routing layer resolving subdomains and static pages in under 15ms globally.</p>
+            </div>
+            <div>
+              <div class="p-tags"><span class="p-tag">TypeScript</span><span class="p-tag">Cloudflare Workers</span></div>
+              <div class="p-links"><a href="#projects">📂 Source Code</a></div>
+            </div>
+          </div>
+          <div class="project-card">
+            <div>
+              <h3 class="p-title">pure-static-compiler</h3>
+              <p class="p-desc">Zero-runtime static HTML engine producing 100/100 Lighthouse performance without client JavaScript bloat.</p>
+            </div>
+            <div>
+              <div class="p-tags"><span class="p-tag">HTML5</span><span class="p-tag">CSS3</span><span class="p-tag">Zero-JS</span></div>
+              <div class="p-links"><a href="#projects">📂 Source Code</a></div>
+            </div>
+          </div>
+        `}
       </div>
     </section>
-    ` : ''}
 
-    ${experience.length > 0 ? `
     <section class="section" id="experience">
       <div class="section-head">
         <span class="section-prompt">04.</span>
-        <h2 class="section-title">Experience & Roles</h2>
+        <h2 class="section-title">Experience &amp; Roles</h2>
       </div>
       <div class="exp-list">
-        ${experience.map(e => `
+        ${experience.length > 0 ? experience.map(e => `
           <div class="exp-card">
             <div class="exp-top">
               <span class="exp-role">${escapeHtml(e.role || '')} @ ${escapeHtml(e.company || '')}</span>
@@ -217,10 +235,24 @@ export function renderDeveloper(siteData, currentPath = '/') {
             </div>
             <p class="exp-desc">${escapeHtml(e.description || '')}</p>
           </div>
-        `).join('')}
+        `).join('') : `
+          <div class="exp-card">
+            <div class="exp-top">
+              <span class="exp-role">Staff Platform Engineer @ Cloud Scale Labs</span>
+              <span class="exp-period">2023 - Present</span>
+            </div>
+            <p class="exp-desc">Spearheading global edge computing infrastructure, CDN caching, and high-velocity developer tooling.</p>
+          </div>
+          <div class="exp-card">
+            <div class="exp-top">
+              <span class="exp-role">Senior Full-Stack Developer @ Modern Web Studio</span>
+              <span class="exp-period">2021 - 2023</span>
+            </div>
+            <p class="exp-desc">Engineered responsive web applications, design systems, and resilient cloud backend services.</p>
+          </div>
+        `}
       </div>
     </section>
-    ` : ''}
 
     <section class="section" id="contact">
       <div class="section-head">

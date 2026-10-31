@@ -267,7 +267,6 @@ export function render404(site) {
     <h1>Page Not Found</h1>
     <p>The page you requested could not be found, or has been moved or unpublished.</p>
     <a href="/" class="btn">Return to Homepage</a>
-    <div class="sub">Powered by MNDO Builder</div>
   </div>
 </body>
 </html>`;

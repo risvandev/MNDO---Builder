@@ -160,7 +160,7 @@ export function renderContactForm(site) {
       <p>${escapeHtml(subheading)}</p>
       ${directEmail ? `<p class="direct-email">Email: <a href="mailto:${escapeHtml(directEmail)}">${escapeHtml(directEmail)}</a></p>` : ''}
     </div>
-    <form class="mndo-contact-form" id="contactForm" data-site-id="${siteId}">
+    <form class="site-contact-form" id="contactForm" data-site-id="${siteId}">
       <!-- Honeypot anti-spam field (hidden from real users) -->
       <div style="display:none !important;" aria-hidden="true">
         <label for="honeypot_field">Leave this empty</label>
@@ -193,14 +193,11 @@ export function renderContactForm(site) {
  */
 export function renderFooter(site) {
   const year = new Date().getFullYear();
-  const title = escapeHtml(site.title || 'MNDO Website');
+  const title = escapeHtml(site.title || 'Personal Website');
   return `
   <footer class="site-footer">
     <div class="footer-container">
       <p class="copyright">&copy; ${year} ${title}. All rights reserved.</p>
-      <div class="platform-badge">
-        <a href="https://mndo.online" target="_blank" rel="noopener noreferrer">Built with <span>MNDO Builder</span></a>
-      </div>
     </div>
   </footer>
   `;
