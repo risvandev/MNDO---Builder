@@ -8,6 +8,7 @@
     "dev": "vite",
     "build": "vite build",
     "preview": "vite preview",
+    "preview:export": "node scripts/generate-previews.js",
     "test": "vitest run",
     "test:watch": "vitest",
     "worker:dev": "wrangler dev worker/src/index.js",

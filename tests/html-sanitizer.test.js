@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { escapeHtml, sanitizeUrl, renderSafeMarkdown } from '../src/templates/sanitizer.js';
+import { escapeHtml, sanitizeUrl, renderSafeMarkdown, sanitizeColor } from '../src/templates/sanitizer.js';
 
 describe('HTML Sanitization & Safe Rendering', () => {
   it('escapes dangerous HTML tags and characters', () => {
@@ -44,4 +44,28 @@ describe('HTML Sanitization & Safe Rendering', () => {
     expect(rendered).toContain('href="#"'); // Rejected javascript: scheme
     expect(rendered).toContain('href="https://mndo.online"');
   });
+
+  describe('Color Sanitization (A13)', () => {
+    it('accepts valid hex colors and standard color formats', () => {
+      expect(sanitizeColor('#2563eb')).toBe('#2563eb');
+      expect(sanitizeColor('#fff')).toBe('#fff');
+      expect(sanitizeColor('#10b981')).toBe('#10b981');
+      expect(sanitizeColor('rgb(37, 99, 235)')).toBe('rgb(37, 99, 235)');
+      expect(sanitizeColor('hsl(217, 91%, 60%)')).toBe('hsl(217, 91%, 60%)');
+    });
+
+    it('rejects CSS injections and falls back to safe default', () => {
+      const fallback = '#2563eb';
+      // Attempt to escape CSS property or style tag
+      expect(sanitizeColor('red; background: url(javascript:alert(1));', fallback)).toBe(fallback);
+      expect(sanitizeColor('blue; } </style><script>alert(1)</script>', fallback)).toBe(fallback);
+      expect(sanitizeColor('expression(alert(1))', fallback)).toBe(fallback);
+      expect(sanitizeColor('url(https://evil.com/leak)', fallback)).toBe(fallback);
+      expect(sanitizeColor('"><script>alert(1)</script>', fallback)).toBe(fallback);
+      expect(sanitizeColor('', fallback)).toBe(fallback);
+      expect(sanitizeColor(null, fallback)).toBe(fallback);
+      expect(sanitizeColor('invalid-color-name')).toBe('#111827');
+    });
+  });
 });
+

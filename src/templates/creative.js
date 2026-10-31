@@ -2,7 +2,7 @@
 // TEMPLATE 5: CREATIVE PORTFOLIO
 // Visual project grids, bold expressive typography, galleries & artistic showcase.
 // ==============================================================================
-import { escapeHtml, sanitizeUrl, renderSafeMarkdown } from './sanitizer.js';
+import { escapeHtml, sanitizeUrl, renderSafeMarkdown, sanitizeColor } from './sanitizer.js';
 import { renderHead, renderNav, renderContactForm, renderFooter, renderClientScript, FONT_PAIRS } from './common.js';
 
 export function renderCreative(siteData, currentPath = '/') {
@@ -15,7 +15,7 @@ export function renderCreative(siteData, currentPath = '/') {
   const gallery = content.gallery || [];
   const skills = content.skills || [];
   const social = content.social || {};
-  const primaryColor = site.theme_config?.primaryColor || '#ec4899'; // Vibrant Pink / Magenta
+  const primaryColor = sanitizeColor(site.theme_config?.primaryColor, '#ec4899'); // Vibrant Pink / Magenta
   const fontPair = FONT_PAIRS['syne-inter'];
 
   return `<!DOCTYPE html>

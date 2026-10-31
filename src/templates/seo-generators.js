@@ -1,7 +1,7 @@
 // ==============================================================================
 // MNDO BUILDER - AUTOMATIC SEO & TECHNICAL RESOURCE GENERATORS
 // ==============================================================================
-import { escapeHtml } from './sanitizer.js';
+import { escapeHtml, sanitizeColor } from './sanitizer.js';
 
 const DOMAIN_SUFFIX = 'mndo.online';
 
@@ -175,7 +175,7 @@ export function renderLlmsTxt(site, pages = [], posts = []) {
  * @returns {string}
  */
 export function renderManifest(site) {
-  const theme = site?.theme_config?.primaryColor || '#2563eb';
+  const theme = sanitizeColor(site?.theme_config?.primaryColor, '#2563eb');
   return JSON.stringify({
     name: site?.title || 'Personal Website',
     short_name: site?.subdomain_slug || 'Site',
@@ -241,7 +241,7 @@ ${items.join('\n')}
  */
 export function render404(site) {
   const title = site?.title || 'Page Not Found';
-  const primaryColor = site?.theme_config?.primaryColor || '#2563eb';
+  const primaryColor = sanitizeColor(site?.theme_config?.primaryColor, '#2563eb');
   return `<!DOCTYPE html>
 <html lang="en">
 <head>

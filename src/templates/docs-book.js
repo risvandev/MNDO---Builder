@@ -2,7 +2,7 @@
 // TEMPLATE 11: TECHNICAL DOCS & KNOWLEDGE BASE (HUGO BLOX DOCS INSPIRED)
 // Designed for technical documentation, handbooks, API guides, and knowledge bases.
 // ==============================================================================
-import { escapeHtml, sanitizeUrl, renderSafeMarkdown } from './sanitizer.js';
+import { escapeHtml, sanitizeUrl, renderSafeMarkdown, sanitizeColor } from './sanitizer.js';
 import { renderHead, renderClientScript, FONT_PAIRS } from './common.js';
 
 export function renderDocsBook(siteData, currentPath = '/') {
@@ -11,7 +11,7 @@ export function renderDocsBook(siteData, currentPath = '/') {
   const posts = siteData.posts || [];
   const content = site.content || {};
   const hero = content.hero || {};
-  const primaryColor = site.theme_config?.primaryColor || '#0284c7';
+  const primaryColor = sanitizeColor(site.theme_config?.primaryColor, '#0284c7');
   const fontPair = FONT_PAIRS['jetbrains-inter'] || FONT_PAIRS['inter-outfit'];
 
   // Normalize path

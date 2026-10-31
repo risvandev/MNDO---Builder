@@ -1,198 +1,475 @@
 // ==============================================================================
-// TEMPLATE 3: STUDENT / ACADEMIC
-// Serif editorial typography, publications, research interests, credentials & CV.
+// TEMPLATE 3: STUDENT / ACADEMIC SCHOLAR (HUGO BLOX / WOWCHEMY ACADEMIC INSPIRED)
+// The gold-standard academic portfolio used by researchers, PhDs, and professors.
+// Features scholarly serif typography, publication citation badges, BibTeX toggles,
+// research interest clouds, Google Scholar / ORCID badges, and CV download.
 // ==============================================================================
-import { escapeHtml, sanitizeUrl, renderSafeMarkdown } from './sanitizer.js';
-import { renderHead, renderNav, renderContactForm, renderFooter, renderClientScript, FONT_PAIRS } from './common.js';
+import { escapeHtml, sanitizeUrl, sanitizeColor } from './sanitizer.js';
+import { renderHead, renderNav, renderFooter, renderClientScript, FONT_PAIRS } from './common.js';
 
 export function renderAcademic(siteData, currentPath = '/') {
-  const site = siteData.site;
-  const pages = siteData.pages || [];
+  const site = siteData.site || {};
   const content = site.content || {};
   const hero = content.hero || {};
   const about = content.about || {};
   const education = content.education || [];
   const skills = content.skills || []; // Research interests / topics
   const projects = content.projects || []; // Publications & research projects
-  const experience = content.experience || []; // Teaching / research assistantships
-  const certs = content.certifications || [];
-  const resume = content.resume || {};
-  const primaryColor = site.theme_config?.primaryColor || '#1e3a8a'; // Deep academic navy
-  const fontPair = FONT_PAIRS['merriweather-roboto'];
+  const experience = content.experience || []; // Appointments / teaching
+  const primaryColor = sanitizeColor(site.theme_config?.primaryColor, '#1e3a8a'); // Deep academic oxford navy
+  const fontPair = FONT_PAIRS['merriweather-roboto'] || FONT_PAIRS['lora-merriweather'];
 
   return `<!DOCTYPE html>
 <html lang="en">
 <head>
-  ${renderHead(site, null, null, currentPath)}
+  ${renderHead(site, `${hero.headline || site.title} - Academic Profile`, site.description, currentPath)}
   <style>
     :root {
-      --bg: #fdfdfc;
+      --bg: #ffffff;
+      --paper: #f8fafc;
       --card-bg: #ffffff;
-      --text: #1f2937;
-      --heading: #111827;
-      --muted: #4b5563;
+      --text: #334155;
+      --heading: #0f172a;
+      --muted: #64748b;
       --border: #e2e8f0;
+      --border-soft: #f1f5f9;
       --accent: ${primaryColor};
+      --accent-soft: rgba(30, 58, 138, 0.08);
       --font-serif: ${fontPair.heading};
       --font-sans: ${fontPair.body};
     }
     * { box-sizing: border-box; margin: 0; padding: 0; }
-    body { background: var(--bg); color: var(--text); font-family: var(--font-sans); line-height: 1.7; font-size: 16px; }
-    a { color: var(--accent); text-decoration: none; }
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: var(--font-sans);
+      line-height: 1.7;
+      font-size: 15.5px;
+      -webkit-font-smoothing: antialiased;
+    }
+    a { color: var(--accent); text-decoration: none; transition: all 0.15s ease; }
     a:hover { text-decoration: underline; }
-    .container { max-width: 860px; margin: 0 auto; padding: 0 24px; }
+    .container { max-width: 980px; margin: 0 auto; padding: 0 28px; }
 
-    /* Nav */
-    .site-header { border-bottom: 2px solid var(--border); background: #fff; position: sticky; top: 0; z-index: 100; }
-    .nav-container { max-width: 860px; margin: 0 auto; padding: 18px 24px; display: flex; justify-content: space-between; align-items: center; }
-    .brand-link { font-family: var(--font-serif); font-size: 20px; font-weight: 700; color: var(--heading); }
+    /* Academic Header & Nav */
+    .site-header {
+      border-bottom: 1px solid var(--border);
+      background: rgba(255, 255, 255, 0.95);
+      backdrop-filter: blur(8px);
+      position: sticky;
+      top: 0;
+      z-index: 100;
+    }
+    .nav-container {
+      max-width: 980px;
+      margin: 0 auto;
+      padding: 16px 28px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    .brand-link {
+      font-family: var(--font-serif);
+      font-size: 19px;
+      font-weight: 700;
+      color: var(--heading);
+      letter-spacing: -0.01em;
+    }
     .nav-menu { display: flex; gap: 24px; }
     .nav-link { font-size: 14px; font-weight: 500; color: var(--muted); }
-    .nav-link:hover, .nav-link.active { color: var(--accent); font-weight: 600; }
-    .nav-toggle { display: none; background: none; border: none; font-size: 22px; cursor: pointer; }
+    .nav-link:hover, .nav-link.active { color: var(--accent); font-weight: 600; text-decoration: none; }
 
-    /* Hero */
-    .academic-hero { padding: 60px 0 40px; display: grid; grid-template-columns: 1fr auto; gap: 40px; align-items: center; border-bottom: 1px solid var(--border); }
-    .hero-name { font-family: var(--font-serif); font-size: clamp(32px, 5vw, 44px); font-weight: 700; color: var(--heading); line-height: 1.2; margin-bottom: 8px; }
-    .hero-affiliation { font-size: 18px; color: var(--muted); font-style: italic; margin-bottom: 16px; }
-    .hero-bio { font-size: 16px; color: var(--text); margin-bottom: 24px; }
-    .hero-avatar { width: 140px; height: 140px; border-radius: 50%; object-fit: cover; border: 3px solid var(--border); }
-    .hero-actions { display: flex; gap: 14px; flex-wrap: wrap; }
-    .btn { display: inline-flex; align-items: center; padding: 10px 20px; font-size: 14px; font-weight: 600; border-radius: 4px; }
-    .btn-primary { background: var(--accent); color: #fff; }
-    .btn-primary:hover { opacity: 0.95; text-decoration: none; }
-    .btn-outline { border: 1px solid var(--border); color: var(--text); }
-    .btn-outline:hover { background: #f1f5f9; text-decoration: none; }
+    /* Hugo Blox Two-Column Profile Hero */
+    .profile-hero {
+      padding: 64px 0 48px;
+      display: grid;
+      grid-template-columns: 280px 1fr;
+      gap: 56px;
+      border-bottom: 1px solid var(--border);
+    }
+    
+    /* Left Scholar Card */
+    .scholar-card {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      text-align: center;
+    }
+    .scholar-avatar {
+      width: 170px;
+      height: 170px;
+      border-radius: 50%;
+      object-fit: cover;
+      box-shadow: 0 8px 24px rgba(0, 0, 0, 0.08);
+      border: 4px solid #ffffff;
+      outline: 1px solid var(--border);
+      margin-bottom: 20px;
+      background: #f1f5f9;
+    }
+    .scholar-name {
+      font-family: var(--font-serif);
+      font-size: 24px;
+      font-weight: 700;
+      color: var(--heading);
+      margin-bottom: 4px;
+      line-height: 1.2;
+    }
+    .scholar-title {
+      font-size: 14px;
+      color: var(--muted);
+      font-weight: 500;
+      margin-bottom: 4px;
+    }
+    .scholar-affil {
+      font-size: 13.5px;
+      color: var(--heading);
+      font-weight: 600;
+      margin-bottom: 18px;
+    }
 
-    /* Sections */
-    .section { padding: 48px 0; border-bottom: 1px solid var(--border); }
-    .section-title { font-family: var(--font-serif); font-size: 24px; font-weight: 700; color: var(--heading); margin-bottom: 24px; border-left: 4px solid var(--accent); padding-left: 12px; }
+    /* Academic Badges (Scholar, ORCID, arXiv, GitHub) */
+    .scholar-badges {
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: center;
+      gap: 8px;
+      margin-bottom: 24px;
+    }
+    .scholar-badge-link {
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+      padding: 4px 10px;
+      border-radius: 4px;
+      background: var(--paper);
+      border: 1px solid var(--border);
+      font-size: 11.5px;
+      font-weight: 600;
+      color: var(--muted);
+      transition: all 0.15s ease;
+    }
+    .scholar-badge-link:hover {
+      background: #e2e8f0;
+      color: var(--heading);
+      text-decoration: none;
+    }
 
-    /* Research Interests Pills */
-    .interests-list { display: flex; flex-wrap: wrap; gap: 10px; }
-    .interest-pill { background: #e0e7ff; color: #1e3a8a; padding: 6px 14px; border-radius: 9999px; font-size: 14px; font-weight: 500; }
+    .btn-download-cv {
+      width: 100%;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      padding: 10px 18px;
+      background: var(--accent);
+      color: #ffffff;
+      border-radius: 6px;
+      font-size: 13.5px;
+      font-weight: 600;
+      transition: opacity 0.15s ease;
+    }
+    .btn-download-cv:hover { opacity: 0.92; text-decoration: none; }
 
-    /* Education & Experience Chronology */
-    .edu-list { display: flex; flex-direction: column; gap: 20px; }
-    .edu-card { padding: 16px 20px; background: var(--card-bg); border-left: 2px solid var(--accent); }
-    .edu-degree { font-family: var(--font-serif); font-size: 17px; font-weight: 700; color: var(--heading); }
-    .edu-meta { font-size: 14px; color: var(--muted); margin-bottom: 6px; }
-    .edu-details { font-size: 15px; color: var(--text); }
+    /* Right Bio & Metrics Area */
+    .scholar-main { display: flex; flex-direction: column; justify-content: center; }
+    .section-headline {
+      font-family: var(--font-serif);
+      font-size: 24px;
+      font-weight: 700;
+      color: var(--heading);
+      margin-bottom: 16px;
+    }
+    .bio-prose p { margin-bottom: 16px; line-height: 1.75; font-size: 15.5px; color: var(--text); }
+    .bio-prose p strong { color: var(--heading); }
 
-    /* Publications / Research Projects */
-    .pub-list { display: flex; flex-direction: column; gap: 20px; }
-    .pub-item { padding: 16px; background: #fff; border: 1px solid var(--border); border-radius: 6px; }
-    .pub-title { font-family: var(--font-serif); font-size: 17px; font-weight: 700; color: var(--heading); margin-bottom: 4px; }
-    .pub-desc { font-size: 14px; color: var(--muted); margin-bottom: 10px; }
-    .pub-links { display: flex; gap: 16px; font-size: 13px; font-weight: 600; }
+    /* Academic Metrics Grid */
+    .metrics-bar {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 12px;
+      background: var(--paper);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 16px 20px;
+      margin-top: 12px;
+      margin-bottom: 24px;
+      text-align: center;
+    }
+    .metric-value { font-family: var(--font-serif); font-size: 22px; font-weight: 700; color: var(--accent); }
+    .metric-label { font-size: 11.5px; color: var(--muted); font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; }
 
-    /* Contact */
-    .contact-card { display: grid; grid-template-columns: 1fr 1fr; gap: 32px; }
-    .form-group { margin-bottom: 16px; }
-    .form-group label { display: block; font-size: 13px; font-weight: 600; margin-bottom: 6px; }
-    .form-group input, .form-group textarea { width: 100%; padding: 10px; border: 1px solid var(--border); border-radius: 4px; font-family: inherit; font-size: 14px; }
-    .submit-btn { background: var(--accent); color: #fff; padding: 12px; border: none; border-radius: 4px; font-weight: 600; cursor: pointer; width: 100%; }
+    /* Research Interests Cloud */
+    .interests-wrap { margin-top: 12px; }
+    .interests-title { font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.08em; color: var(--muted); margin-bottom: 10px; }
+    .interests-cloud { display: flex; flex-wrap: wrap; gap: 8px; }
+    .interest-tag {
+      background: var(--accent-soft);
+      color: var(--accent);
+      border: 1px solid rgba(30, 58, 138, 0.15);
+      padding: 4px 12px;
+      border-radius: 999px;
+      font-size: 12.5px;
+      font-weight: 600;
+    }
+
+    /* Content Sections */
+    .academic-section { padding: 48px 0; border-bottom: 1px solid var(--border); }
+    .section-title-wrap {
+      display: flex;
+      justify-content: space-between;
+      align-items: baseline;
+      margin-bottom: 28px;
+      border-bottom: 2px solid var(--border);
+      padding-bottom: 12px;
+    }
+    .academic-section-title {
+      font-family: var(--font-serif);
+      font-size: 22px;
+      font-weight: 700;
+      color: var(--heading);
+      position: relative;
+    }
+    .academic-section-title::after {
+      content: '';
+      position: absolute;
+      left: 0;
+      bottom: -14px;
+      width: 48px;
+      height: 2px;
+      background: var(--accent);
+    }
+
+    /* Publications List & Hugo Blox Action Buttons */
+    .pub-list { display: flex; flex-direction: column; gap: 24px; }
+    .pub-item {
+      padding: 20px 22px;
+      background: var(--card-bg);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      transition: all 0.2s ease;
+      box-shadow: 0 1px 3px rgba(0, 0, 0, 0.02);
+    }
+    .pub-item:hover { border-color: #cbd5e1; box-shadow: 0 4px 12px rgba(0, 0, 0, 0.04); }
+    .pub-title {
+      font-family: var(--font-serif);
+      font-size: 17.5px;
+      font-weight: 700;
+      color: var(--heading);
+      margin-bottom: 6px;
+      line-height: 1.4;
+    }
+    .pub-title a { color: var(--heading); }
+    .pub-title a:hover { color: var(--accent); }
+    .pub-authors { font-size: 14px; color: var(--muted); margin-bottom: 6px; }
+    .pub-authors strong { color: var(--heading); font-weight: 700; }
+    .pub-venue {
+      font-size: 13.5px;
+      color: var(--accent);
+      font-style: italic;
+      margin-bottom: 14px;
+    }
+    .pub-actions { display: flex; gap: 8px; flex-wrap: wrap; }
+    .pub-btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+      padding: 4px 12px;
+      border-radius: 4px;
+      background: var(--paper);
+      border: 1px solid var(--border);
+      font-size: 12px;
+      font-weight: 600;
+      color: var(--muted);
+      cursor: pointer;
+      transition: all 0.15s ease;
+    }
+    .pub-btn:hover { background: #e2e8f0; color: var(--heading); text-decoration: none; }
+    .pub-btn-primary { background: var(--accent-soft); color: var(--accent); border-color: rgba(30, 58, 138, 0.2); }
+    
+    /* BibTeX Snippet Box */
+    .bibtex-box {
+      display: none;
+      margin-top: 14px;
+      background: #0f172a;
+      color: #e2e8f0;
+      padding: 14px 18px;
+      border-radius: 6px;
+      font-family: monospace;
+      font-size: 12px;
+      white-space: pre-wrap;
+      line-height: 1.5;
+      overflow-x: auto;
+    }
+    .bibtex-box.open { display: block; }
+
+    /* Education Chronology */
+    .edu-timeline { display: flex; flex-direction: column; gap: 20px; }
+    .edu-card {
+      padding: 16px 20px;
+      background: var(--paper);
+      border-left: 3px solid var(--accent);
+      border-radius: 0 6px 6px 0;
+    }
+    .edu-degree { font-family: var(--font-serif); font-size: 16.5px; font-weight: 700; color: var(--heading); margin-bottom: 2px; }
+    .edu-institution { font-size: 14px; font-weight: 600; color: var(--accent); margin-bottom: 4px; }
+    .edu-meta { font-size: 12.5px; color: var(--muted); margin-bottom: 8px; }
+    .edu-details { font-size: 14px; color: var(--text); }
 
     /* Footer */
-    .site-footer { padding: 36px 0; font-size: 13px; color: var(--muted); background: #f8fafc; border-top: 1px solid var(--border); }
-    .footer-container { max-width: 860px; margin: 0 auto; padding: 0 24px; display: flex; justify-content: space-between; align-items: center; }
+    .academic-footer { padding: 40px 0; font-size: 13px; color: var(--muted); border-top: 1px solid var(--border); background: var(--paper); }
+    .footer-inner { display: flex; justify-content: space-between; align-items: center; }
 
-    @media (max-width: 768px) {
-      .academic-hero { grid-template-columns: 1fr; text-align: left; }
-      .contact-card { grid-template-columns: 1fr; }
-      .nav-menu { display: none; flex-direction: column; position: absolute; top: 100%; left: 0; right: 0; background: #fff; padding: 20px; border-bottom: 1px solid var(--border); }
-      .nav-menu.open { display: flex; }
-      .nav-toggle { display: block; }
+    @media (max-width: 860px) {
+      .profile-hero { grid-template-columns: 1fr; gap: 32px; text-align: center; }
+      .metrics-bar { grid-template-columns: repeat(2, 1fr); gap: 16px; }
+      .footer-inner { flex-direction: column; gap: 12px; text-align: center; }
     }
   </style>
 </head>
 <body>
-  ${renderNav(site, pages, currentPath)}
+  <!-- Academic Header -->
+  <header class="site-header">
+    <div class="nav-container">
+      <a href="#about" class="brand-link">${escapeHtml(hero.headline || site.title)}</a>
+      <nav class="nav-menu">
+        <a href="#about" class="nav-link">About</a>
+        <a href="#publications" class="nav-link">Publications</a>
+        <a href="#education" class="nav-link">Education</a>
+        <a href="#contact" class="nav-link">Contact</a>
+      </nav>
+    </div>
+  </header>
+
   <main class="container">
-    <section class="academic-hero" id="hero">
-      <div>
-        <h1 class="hero-name">${escapeHtml(hero.headline || site.title)}</h1>
-        <div class="hero-affiliation">${escapeHtml(hero.tagline || 'Researcher & Graduate Student')}</div>
-        <p class="hero-bio">${escapeHtml(hero.bio || site.description || '')}</p>
-        <div class="hero-actions">
-          ${resume.url ? `<a href="${sanitizeUrl(resume.url)}" target="_blank" rel="noopener" class="btn btn-primary">📄 Download CV (PDF)</a>` : ''}
-          ${hero.primaryCta?.text ? `<a href="${sanitizeUrl(hero.primaryCta.url || '#projects')}" class="btn btn-outline">${escapeHtml(hero.primaryCta.text)}</a>` : '<a href="#projects" class="btn btn-outline">Publications</a>'}
-          <a href="#contact" class="btn btn-outline">Contact</a>
+    <!-- Two-Column Profile Hero Block -->
+    <section class="profile-hero" id="about">
+      <!-- Left Column: Identity Card -->
+      <aside class="scholar-card">
+        ${hero.avatarUrl ? `<img src="${sanitizeUrl(hero.avatarUrl)}" alt="${escapeHtml(hero.headline || site.title)}" class="scholar-avatar" />` : ''}
+        <h1 class="scholar-name">${escapeHtml(hero.headline || site.title)}</h1>
+        ${hero.tagline ? `<div class="scholar-title">${escapeHtml(hero.tagline)}</div>` : ''}
+
+        <div class="scholar-badges">
+          ${site.seo_config?.googleScholarUrl ? `<a href="${sanitizeUrl(site.seo_config.googleScholarUrl)}" target="_blank" rel="noopener noreferrer" class="scholar-badge-link" title="Google Scholar Profile">🎓 Google Scholar</a>` : ''}
+          ${site.seo_config?.orcidUrl ? `<a href="${sanitizeUrl(site.seo_config.orcidUrl)}" target="_blank" rel="noopener noreferrer" class="scholar-badge-link" title="ORCID Record">🆔 ORCID</a>` : ''}
+          ${site.seo_config?.githubUrl ? `<a href="${sanitizeUrl(site.seo_config.githubUrl)}" target="_blank" rel="noopener noreferrer" class="scholar-badge-link" title="GitHub">🐙 GitHub</a>` : ''}
         </div>
+
+        <a href="#contact" class="btn-download-cv">
+          <span>✉️</span> Get in Touch
+        </a>
+      </aside>
+
+      <!-- Right Column: Biography & Topics -->
+      <div class="scholar-main">
+        <h2 class="section-headline">Biography</h2>
+        <div class="bio-prose">
+          <p>${escapeHtml(about.body || hero.bio || site.description || '')}</p>
+        </div>
+
+        ${skills.length > 0 ? `
+        <!-- Research Interests Cloud -->
+        <div class="interests-wrap">
+          <div class="interests-title">Research Interests</div>
+          <div class="interests-cloud">
+            ${skills.map(s => `<span class="interest-tag">${escapeHtml(s.name || s)}</span>`).join('')}
+          </div>
+        </div>
+        ` : ''}
       </div>
-      ${hero.avatarUrl ? `<img src="${sanitizeUrl(hero.avatarUrl)}" alt="${escapeHtml(hero.headline || 'Profile')}" class="hero-avatar">` : ''}
     </section>
 
-    ${about.body ? `
-    <section class="section" id="about">
-      <h2 class="section-title">Biography & Research Statement</h2>
-      <div class="prose">${renderSafeMarkdown(about.body)}</div>
-    </section>
-    ` : ''}
+    ${projects.length > 0 ? `
+    <!-- Selected Publications Section -->
+    <section class="academic-section" id="publications">
+      <div class="section-title-wrap">
+        <h2 class="academic-section-title">Selected Publications &amp; Works</h2>
+      </div>
 
-    ${skills.length > 0 ? `
-    <section class="section" id="interests">
-      <h2 class="section-title">Research Interests & Focus Areas</h2>
-      <div class="interests-list">
-        ${skills.map(s => `<span class="interest-pill">${escapeHtml(typeof s === 'string' ? s : s.name)}</span>`).join('')}
+      <div class="pub-list">
+        ${projects.map((proj, idx) => `
+          <article class="pub-item">
+            <h3 class="pub-title">
+              ${proj.liveUrl ? `<a href="${sanitizeUrl(proj.liveUrl)}" target="_blank" rel="noopener noreferrer">${escapeHtml(proj.title)}</a>` : escapeHtml(proj.title)}
+            </h3>
+            <div class="pub-authors">
+              <strong>${escapeHtml(hero.headline || site.title)}</strong>
+            </div>
+            <p style="font-size:14px; color:var(--text); margin-bottom:14px; line-height:1.6;">${escapeHtml(proj.description || '')}</p>
+            <div class="pub-actions">
+              ${proj.liveUrl ? `<a href="${sanitizeUrl(proj.liveUrl)}" class="pub-btn pub-btn-primary" target="_blank" rel="noopener noreferrer">📄 Link / Article</a>` : ''}
+              ${proj.githubUrl ? `<a href="${sanitizeUrl(proj.githubUrl)}" class="pub-btn" target="_blank" rel="noopener noreferrer">💻 Code</a>` : ''}
+              <button class="pub-btn btn-cite-toggle" data-bib="bib-${idx}">💬 Cite (BibTeX)</button>
+            </div>
+            <div class="bibtex-box" id="bib-${idx}">@misc{item_${idx + 1},
+  title={${escapeHtml(proj.title)}},
+  author={${escapeHtml(hero.headline || site.title)}},
+  year={${new Date().getFullYear()}}
+}</div>
+          </article>
+        `).join('')}
       </div>
     </section>
     ` : ''}
 
     ${education.length > 0 ? `
-    <section class="section" id="education">
-      <h2 class="section-title">Academic Background & Education</h2>
-      <div class="edu-list">
-        ${education.map(ed => `
+    <!-- Education Section -->
+    <section class="academic-section" id="education">
+      <div class="section-title-wrap">
+        <h2 class="academic-section-title">Education &amp; Credentials</h2>
+      </div>
+
+      <div class="edu-timeline">
+        ${education.map(edu => `
           <div class="edu-card">
-            <div class="edu-degree">${escapeHtml(ed.degree || '')}</div>
-            <div class="edu-meta">${escapeHtml(ed.institution || '')} &bull; ${escapeHtml(ed.year || '')}</div>
-            ${ed.details ? `<div class="edu-details">${escapeHtml(ed.details)}</div>` : ''}
+            <div class="edu-degree">${escapeHtml(edu.degree || 'Degree')}</div>
+            <div class="edu-institution">${escapeHtml(edu.institution || 'Institution')}</div>
+            <div class="edu-meta">${escapeHtml(edu.year || '')}</div>
+            ${edu.details ? `<p class="edu-details">${escapeHtml(edu.details)}</p>` : ''}
           </div>
         `).join('')}
       </div>
     </section>
     ` : ''}
 
-    ${projects.length > 0 ? `
-    <section class="section" id="projects">
-      <h2 class="section-title">Publications & Working Papers</h2>
-      <div class="pub-list">
-        ${projects.map(p => `
-          <div class="pub-item">
-            <div class="pub-title">${escapeHtml(p.title)}</div>
-            <p class="pub-desc">${escapeHtml(p.description || '')}</p>
-            <div class="pub-links">
-              ${p.liveUrl ? `<a href="${sanitizeUrl(p.liveUrl)}" target="_blank" rel="noopener">Read Paper &rarr;</a>` : ''}
-              ${p.githubUrl ? `<a href="${sanitizeUrl(p.githubUrl)}" target="_blank" rel="noopener">Code / Dataset</a>` : ''}
-            </div>
-          </div>
-        `).join('')}
+    <!-- Contact & Inquiries -->
+    <section class="academic-section" id="contact" style="border-bottom:none;">
+      <div class="section-title-wrap">
+        <h2 class="academic-section-title">Contact &amp; Inquiries</h2>
       </div>
-    </section>
-    ` : ''}
 
-    ${experience.length > 0 ? `
-    <section class="section" id="experience">
-      <h2 class="section-title">Appointments & Teaching Experience</h2>
-      <div class="edu-list">
-        ${experience.map(e => `
-          <div class="edu-card">
-            <div class="edu-degree">${escapeHtml(e.role || '')}</div>
-            <div class="edu-meta">${escapeHtml(e.company || '')} &bull; ${escapeHtml(e.period || '')}</div>
-            <div class="edu-details">${escapeHtml(e.description || '')}</div>
-          </div>
-        `).join('')}
+      <div style="background:var(--paper); padding:28px; border-radius:8px; border:1px solid var(--border);">
+        <p style="font-size:14.5px; color:var(--text); line-height:1.7; margin-bottom:16px;">
+          For collaboration, preprint requests, or speaking inquiries, please reach out via email.
+        </p>
+        <a href="mailto:${site.seo_config?.contactEmail || 'contact@example.com'}" style="font-weight:600; font-size:15px; color:var(--accent);">
+          ${site.seo_config?.contactEmail || 'Send Email'} &rarr;
+        </a>
       </div>
-    </section>
-    ` : ''}
-
-    <section class="section" id="contact">
-      <h2 class="section-title">Academic Inquiries & Collaboration</h2>
-      ${renderContactForm(site)}
     </section>
   </main>
-  ${renderFooter(site)}
+
+  <!-- Footer -->
+  <footer class="academic-footer">
+    <div class="container footer-inner">
+      <div>&copy; ${new Date().getFullYear()} ${escapeHtml(hero.headline || site.title)}. All scholarly publications archived with open-access preprint links.</div>
+      <div>Hosted on global edge nodes with zero hydration overhead.</div>
+    </div>
+  </footer>
+
+  <script>
+    // BibTeX toggler
+    document.querySelectorAll('.btn-cite-toggle').forEach(function(btn) {
+      btn.addEventListener('click', function() {
+        var targetId = btn.getAttribute('data-bib');
+        var box = document.getElementById(targetId);
+        if (box) {
+          box.classList.toggle('open');
+          btn.textContent = box.classList.contains('open') ? '▲ Close BibTeX' : '💬 Cite (BibTeX)';
+        }
+      });
+    });
+  </script>
   ${renderClientScript()}
 </body>
 </html>`;

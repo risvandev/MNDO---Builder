@@ -2,7 +2,7 @@
 // TEMPLATE 7: PERSONAL BLOG
 // Editorial reading experience, article archive, reading time, author card.
 // ==============================================================================
-import { escapeHtml, sanitizeUrl, renderSafeMarkdown } from './sanitizer.js';
+import { escapeHtml, sanitizeUrl, renderSafeMarkdown, sanitizeColor } from './sanitizer.js';
 import { renderHead, renderNav, renderContactForm, renderFooter, renderClientScript, FONT_PAIRS } from './common.js';
 
 export function renderPersonalBlog(siteData, currentPath = '/') {
@@ -13,7 +13,7 @@ export function renderPersonalBlog(siteData, currentPath = '/') {
   const hero = content.hero || {};
   const about = content.about || {};
   const social = content.social || {};
-  const primaryColor = site.theme_config?.primaryColor || '#b45309'; // Warm Amber / Editorial
+  const primaryColor = sanitizeColor(site.theme_config?.primaryColor, '#b45309'); // Warm Amber / Editorial
   const fontPair = FONT_PAIRS['merriweather-roboto'];
 
   // Check if viewing an individual article: /blog/:slug

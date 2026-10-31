@@ -2,7 +2,7 @@
 // TEMPLATE 12: ULTRA-MINIMALIST TXT & ESSAYIST (BEAR BLOG & MATAROA INSPIRED)
 // Designed for pure writing, essayists, and thinkers. Sub-5KB, instant 0.05s load time.
 // ==============================================================================
-import { escapeHtml, sanitizeUrl, renderSafeMarkdown } from './sanitizer.js';
+import { escapeHtml, sanitizeUrl, renderSafeMarkdown, sanitizeColor } from './sanitizer.js';
 import { renderHead, renderClientScript, FONT_PAIRS } from './common.js';
 
 export function renderMinimalText(siteData, currentPath = '/') {
@@ -11,7 +11,7 @@ export function renderMinimalText(siteData, currentPath = '/') {
   const posts = siteData.posts || [];
   const content = site.content || {};
   const hero = content.hero || {};
-  const primaryColor = site.theme_config?.primaryColor || '#171717';
+  const primaryColor = sanitizeColor(site.theme_config?.primaryColor, '#171717');
   const fontPair = FONT_PAIRS['merriweather-roboto'] || FONT_PAIRS['inter-outfit'];
 
   const postMatch = (currentPath || '/').match(/^\/blog\/([a-z0-9-]+)\/?$/i);

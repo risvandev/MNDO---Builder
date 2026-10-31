@@ -1,268 +1,430 @@
 // ==============================================================================
-// TEMPLATE 2: DEVELOPER PORTFOLIO
-// Dark terminal aesthetic, monospace accents, tech stack pills, repo-style cards.
+// TEMPLATE 2: DEVELOPER TERMINAL (NEOVIM & ARCH LINUX CLI INSPIRED)
+// Authentic terminal window chrome with traffic light controls, realistic zsh prompt,
+// git branch telemetry, syntax-colored JSON outputs, and GitHub repository cards with stars & forks.
 // ==============================================================================
-import { escapeHtml, sanitizeUrl, renderSafeMarkdown } from './sanitizer.js';
-import { renderHead, renderNav, renderContactForm, renderFooter, renderClientScript, FONT_PAIRS } from './common.js';
+import { escapeHtml, sanitizeUrl, sanitizeColor } from './sanitizer.js';
+import { renderHead, renderClientScript, FONT_PAIRS } from './common.js';
 
 export function renderDeveloper(siteData, currentPath = '/') {
-  const site = siteData.site;
-  const pages = siteData.pages || [];
+  const site = siteData.site || {};
   const content = site.content || {};
   const hero = content.hero || {};
   const about = content.about || {};
   const skills = content.skills || [];
   const projects = content.projects || [];
   const experience = content.experience || [];
-  const social = content.social || {};
-  const primaryColor = site.theme_config?.primaryColor || '#10b981'; // Emerald
+  const primaryColor = sanitizeColor(site.theme_config?.primaryColor, '#10b981'); // Emerald terminal green
   const fontPair = FONT_PAIRS['jetbrains-inter'];
 
   return `<!DOCTYPE html>
 <html lang="en">
 <head>
-  ${renderHead(site, null, null, currentPath)}
+  ${renderHead(site, `${hero.headline || site.title} - Terminal Portfolio`, site.description, currentPath)}
   <style>
     :root {
       --bg: #090d16;
-      --card-bg: #111827;
-      --card-border: #1f2937;
-      --text: #f3f4f6;
-      --muted: #9ca3af;
+      --term-bg: #0d1117;
+      --term-bar: #161b22;
+      --card-bg: #161b22;
+      --card-border: #30363d;
+      --text: #c9d1d9;
+      --heading: #f0f6fc;
+      --muted: #8b949e;
       --accent: ${primaryColor};
+      --accent-soft: rgba(16, 185, 129, 0.12);
       --font-mono: ${fontPair.heading};
       --font-body: ${fontPair.body};
     }
     * { box-sizing: border-box; margin: 0; padding: 0; }
-    body { background: var(--bg); color: var(--text); font-family: var(--font-body); line-height: 1.6; }
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: var(--font-body);
+      line-height: 1.6;
+      font-size: 15px;
+      -webkit-font-smoothing: antialiased;
+      padding: 32px 16px 80px;
+    }
     a { color: var(--accent); text-decoration: none; }
     a:hover { text-decoration: underline; }
-    .container { max-width: 960px; margin: 0 auto; padding: 0 24px; }
-    
-    /* Nav */
-    .site-header { border-bottom: 1px solid var(--card-border); background: rgba(9, 13, 22, 0.85); backdrop-filter: blur(12px); position: sticky; top: 0; z-index: 100; }
-    .nav-container { max-width: 960px; margin: 0 auto; padding: 18px 24px; display: flex; justify-content: space-between; align-items: center; }
-    .brand-link { font-family: var(--font-mono); font-weight: 700; color: var(--text); display: flex; align-items: center; gap: 8px; }
-    .brand-prompt { color: var(--accent); }
-    .nav-menu { display: flex; gap: 20px; }
-    .nav-link { font-family: var(--font-mono); font-size: 13px; color: var(--muted); }
-    .nav-link:hover, .nav-link.active { color: var(--accent); }
-    .nav-toggle { display: none; background: none; border: none; color: #fff; font-size: 22px; cursor: pointer; }
+    .container { max-width: 980px; margin: 0 auto; }
 
-    /* Terminal Hero */
-    .hero-terminal { margin-top: 48px; background: #0f172a; border: 1px solid var(--card-border); border-radius: 10px; overflow: hidden; box-shadow: 0 20px 40px rgba(0,0,0,0.6); }
-    .terminal-bar { background: #1e293b; padding: 10px 16px; display: flex; align-items: center; gap: 8px; }
+    /* Terminal Window Chrome */
+    .terminal-window {
+      background: var(--term-bg);
+      border: 1px solid var(--card-border);
+      border-radius: 12px;
+      overflow: hidden;
+      box-shadow: 0 24px 64px rgba(0, 0, 0, 0.7);
+    }
+
+    /* Terminal Title Bar */
+    .terminal-titlebar {
+      background: var(--term-bar);
+      border-bottom: 1px solid var(--card-border);
+      padding: 12px 18px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+    .traffic-lights { display: flex; align-items: center; gap: 8px; }
     .t-dot { width: 12px; height: 12px; border-radius: 50%; display: inline-block; }
-    .t-red { background: #ef4444; } .t-yellow { background: #f59e0b; } .t-green { background: #10b981; }
-    .terminal-title { margin-left: 12px; font-family: var(--font-mono); font-size: 12px; color: var(--muted); }
-    .terminal-body { padding: 32px 28px; }
-    .t-command { font-family: var(--font-mono); font-size: 14px; color: var(--muted); margin-bottom: 12px; }
-    .t-prompt { color: var(--accent); font-weight: 700; }
-    .hero-name { font-family: var(--font-mono); font-size: clamp(28px, 4vw, 42px); font-weight: 800; color: #fff; margin-bottom: 8px; }
-    .hero-tag { font-family: var(--font-mono); color: var(--accent); font-size: 18px; margin-bottom: 20px; }
-    .hero-bio { font-size: 16px; color: #d1d5db; max-width: 680px; margin-bottom: 28px; line-height: 1.7; }
-    .hero-links { display: flex; gap: 16px; flex-wrap: wrap; }
-    .btn { display: inline-flex; align-items: center; gap: 8px; font-family: var(--font-mono); font-size: 13px; font-weight: 600; padding: 10px 20px; border-radius: 6px; }
-    .btn-primary { background: var(--accent); color: #000; text-decoration: none; }
-    .btn-primary:hover { opacity: 0.9; text-decoration: none; }
-    .btn-outline { border: 1px solid var(--card-border); color: var(--text); }
-    .btn-outline:hover { background: #1e293b; text-decoration: none; }
+    .t-red { background: #ff5f56; border: 1px solid #e0443e; }
+    .t-yellow { background: #ffbd2e; border: 1px solid #dea123; }
+    .t-green { background: #27c93f; border: 1px solid #1aab29; }
+    .terminal-title {
+      font-family: var(--font-mono);
+      font-size: 12.5px;
+      color: var(--muted);
+      font-weight: 500;
+      letter-spacing: 0.02em;
+    }
+    .terminal-status-badge {
+      font-family: var(--font-mono);
+      font-size: 11px;
+      background: rgba(16, 185, 129, 0.15);
+      color: var(--accent);
+      padding: 2px 8px;
+      border-radius: 4px;
+      border: 1px solid rgba(16, 185, 129, 0.3);
+    }
 
-    /* Sections */
-    .section { padding: 56px 0; }
-    .section-head { display: flex; align-items: center; gap: 12px; margin-bottom: 32px; border-bottom: 1px solid var(--card-border); padding-bottom: 12px; }
-    .section-prompt { font-family: var(--font-mono); color: var(--accent); font-weight: 700; }
-    .section-title { font-family: var(--font-mono); font-size: 18px; font-weight: 700; color: #fff; }
+    /* Terminal Content */
+    .terminal-body { padding: 36px 32px; }
 
-    /* Tech Stack Pills */
-    .skills-container { display: flex; flex-wrap: wrap; gap: 10px; }
-    .skill-card { background: var(--card-bg); border: 1px solid var(--card-border); padding: 8px 14px; border-radius: 6px; font-family: var(--font-mono); font-size: 13px; display: flex; align-items: center; gap: 8px; }
-    .lang-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--accent); }
+    /* CLI Prompt Formatting */
+    .cli-command-row {
+      display: flex;
+      align-items: baseline;
+      gap: 10px;
+      font-family: var(--font-mono);
+      font-size: 14px;
+      margin-bottom: 14px;
+    }
+    .cli-prompt { color: var(--accent); font-weight: 700; }
+    .cli-path { color: #58a6ff; font-weight: 600; }
+    .cli-git { color: #d29922; font-size: 12.5px; }
+    .cli-cmd { color: #ffffff; font-weight: 600; }
 
-    /* Projects Grid */
-    .projects-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 20px; }
-    .project-card { background: var(--card-bg); border: 1px solid var(--card-border); border-radius: 8px; padding: 20px; display: flex; flex-direction: column; justify-content: space-between; transition: transform 0.2s, border-color 0.2s; }
-    .project-card:hover { transform: translateY(-3px); border-color: var(--accent); }
-    .p-title { font-family: var(--font-mono); font-size: 16px; font-weight: 700; color: #fff; margin-bottom: 8px; }
-    .p-desc { font-size: 14px; color: var(--muted); margin-bottom: 16px; flex-grow: 1; }
-    .p-tags { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 16px; }
-    .p-tag { font-family: var(--font-mono); font-size: 11px; background: #1e293b; color: #94a3b8; padding: 2px 8px; border-radius: 4px; }
-    .p-links { display: flex; gap: 14px; font-family: var(--font-mono); font-size: 12px; }
+    /* Output Blocks */
+    .cli-output-block { margin-bottom: 36px; padding-left: 4px; }
+    .hero-name-big {
+      font-family: var(--font-mono);
+      font-size: clamp(32px, 5vw, 44px);
+      font-weight: 800;
+      color: #ffffff;
+      letter-spacing: -0.02em;
+      line-height: 1.15;
+      margin-bottom: 8px;
+    }
+    .hero-role-cli {
+      font-family: var(--font-mono);
+      font-size: 17px;
+      color: var(--accent);
+      margin-bottom: 16px;
+    }
+    .hero-bio-cli {
+      font-size: 15px;
+      color: #c9d1d9;
+      line-height: 1.7;
+      max-width: 720px;
+      margin-bottom: 24px;
+    }
+    .cli-actions { display: flex; gap: 12px; flex-wrap: wrap; }
+    .btn-cli {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      font-family: var(--font-mono);
+      font-size: 13px;
+      font-weight: 600;
+      padding: 8px 16px;
+      border-radius: 6px;
+      border: 1px solid var(--card-border);
+      background: var(--card-bg);
+      color: #ffffff;
+      transition: all 0.15s ease;
+    }
+    .btn-cli:hover { border-color: var(--accent); color: var(--accent); text-decoration: none; }
+    .btn-cli-primary { background: var(--accent); color: #000000; border-color: var(--accent); }
+    .btn-cli-primary:hover { opacity: 0.9; color: #000; }
 
-    /* Timeline */
-    .exp-list { display: flex; flex-direction: column; gap: 20px; }
-    .exp-card { background: var(--card-bg); border: 1px solid var(--card-border); border-radius: 8px; padding: 20px; }
-    .exp-top { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 6px; flex-wrap: wrap; }
-    .exp-role { font-family: var(--font-mono); font-weight: 700; color: #fff; font-size: 15px; }
-    .exp-period { font-family: var(--font-mono); font-size: 12px; color: var(--accent); }
-    .exp-company { color: var(--muted); font-size: 13px; margin-bottom: 10px; }
-    .exp-desc { font-size: 14px; color: #d1d5db; }
+    /* GitHub Repository Cards Grid */
+    .repo-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(360px, 1fr)); gap: 16px; margin-top: 12px; }
+    .repo-card {
+      background: var(--card-bg);
+      border: 1px solid var(--card-border);
+      border-radius: 8px;
+      padding: 20px;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      transition: all 0.2s ease;
+    }
+    .repo-card:hover {
+      border-color: #58a6ff;
+      transform: translateY(-2px);
+      box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
+    }
+    .repo-top { display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px; }
+    .repo-title {
+      font-family: var(--font-mono);
+      font-size: 15.5px;
+      font-weight: 700;
+      color: #58a6ff;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .repo-title:hover { text-decoration: underline; }
+    .repo-visibility {
+      font-size: 11px;
+      font-family: var(--font-mono);
+      color: var(--muted);
+      border: 1px solid var(--card-border);
+      padding: 2px 7px;
+      border-radius: 999px;
+    }
+    .repo-desc { font-size: 13.5px; color: var(--text); line-height: 1.55; margin-bottom: 16px; flex: 1; }
+    .repo-meta {
+      display: flex;
+      align-items: center;
+      gap: 16px;
+      font-family: var(--font-mono);
+      font-size: 12px;
+      color: var(--muted);
+    }
+    .lang-pill { display: inline-flex; align-items: center; gap: 6px; }
+    .lang-dot { width: 9px; height: 9px; border-radius: 50%; }
 
-    /* Contact Form */
-    .contact-card { background: var(--card-bg); border: 1px solid var(--card-border); border-radius: 8px; padding: 32px; display: grid; grid-template-columns: 1fr 1fr; gap: 32px; }
-    .form-group { margin-bottom: 16px; }
-    .form-group label { display: block; font-family: var(--font-mono); font-size: 12px; color: var(--muted); margin-bottom: 6px; }
-    .form-group input, .form-group textarea { width: 100%; background: #0b0f19; border: 1px solid var(--card-border); border-radius: 6px; padding: 10px 14px; color: #fff; font-family: var(--font-mono); font-size: 13px; }
-    .form-group input:focus, .form-group textarea:focus { outline: none; border-color: var(--accent); }
-    .submit-btn { background: var(--accent); color: #000; font-family: var(--font-mono); font-weight: 700; font-size: 13px; padding: 12px; border: none; border-radius: 6px; cursor: pointer; width: 100%; }
-    .form-status { margin-top: 12px; font-family: var(--font-mono); font-size: 12px; }
-    .form-status.success { color: #10b981; }
-    .form-status.error { color: #ef4444; }
+    /* Tech Stack JSON Box */
+    .json-box {
+      background: #090d16;
+      border: 1px solid var(--card-border);
+      border-radius: 8px;
+      padding: 18px 22px;
+      font-family: var(--font-mono);
+      font-size: 13px;
+      line-height: 1.6;
+      color: #e6edf3;
+      overflow-x: auto;
+    }
+    .json-key { color: #7ee787; }
+    .json-val { color: #a5d6ff; }
+    .json-num { color: #ff7b72; }
 
-    /* Footer */
-    .site-footer { border-top: 1px solid var(--card-border); padding: 40px 0; font-family: var(--font-mono); font-size: 12px; color: var(--muted); }
-    .footer-container { max-width: 960px; margin: 0 auto; padding: 0 24px; display: flex; justify-content: space-between; align-items: center; }
+    /* Experience CLI Timeline */
+    .exp-cli-item {
+      padding: 14px 18px;
+      border-left: 2px solid var(--card-border);
+      margin-left: 8px;
+      margin-bottom: 16px;
+      position: relative;
+    }
+    .exp-cli-item::before {
+      content: '';
+      position: absolute;
+      left: -6px;
+      top: 18px;
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+      background: var(--accent);
+      border: 2px solid var(--term-bg);
+    }
+    .exp-cli-title { font-family: var(--font-mono); font-size: 15px; font-weight: 700; color: #fff; margin-bottom: 4px; }
+    .exp-cli-meta { font-family: var(--font-mono); font-size: 12.5px; color: var(--accent); margin-bottom: 8px; }
+    .exp-cli-desc { font-size: 14px; color: var(--text); line-height: 1.6; }
+
+    /* Interactive Command Bar at Bottom */
+    .cmd-bar {
+      margin-top: 40px;
+      padding: 16px 20px;
+      background: var(--term-bar);
+      border: 1px solid var(--card-border);
+      border-radius: 8px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      flex-wrap: wrap;
+      gap: 12px;
+    }
+    .cmd-shortcuts { display: flex; align-items: center; gap: 8px; font-family: var(--font-mono); font-size: 12px; color: var(--muted); }
+    .shortcut-pill {
+      background: var(--card-bg);
+      border: 1px solid var(--card-border);
+      padding: 3px 10px;
+      border-radius: 4px;
+      color: #ffffff;
+      cursor: pointer;
+    }
+    .shortcut-pill:hover { border-color: var(--accent); color: var(--accent); }
 
     @media (max-width: 768px) {
-      .contact-card { grid-template-columns: 1fr; }
-      .nav-menu { display: none; flex-direction: column; position: absolute; top: 100%; left: 0; right: 0; background: var(--bg); padding: 20px; border-bottom: 1px solid var(--card-border); }
-      .nav-menu.open { display: flex; }
-      .nav-toggle { display: block; }
+      .terminal-body { padding: 24px 18px; }
+      .repo-grid { grid-template-columns: 1fr; }
     }
   </style>
 </head>
 <body>
-  ${renderNav(site, pages, currentPath)}
-  <main class="container">
-    <div class="hero-terminal">
-      <div class="terminal-bar">
-        <span class="t-dot t-red"></span>
-        <span class="t-dot t-yellow"></span>
-        <span class="t-dot t-green"></span>
-        <span class="terminal-title">${escapeHtml(site.subdomain_slug || 'terminal')} &mdash; bash</span>
+  <div class="container">
+    <!-- Terminal Window -->
+    <div class="terminal-window">
+      <!-- Title Bar -->
+      <div class="terminal-titlebar">
+        <div class="traffic-lights">
+          <span class="t-dot t-red"></span>
+          <span class="t-dot t-yellow"></span>
+          <span class="t-dot t-green"></span>
+        </div>
+        <div class="terminal-title">alex@arch-linux: ~/portfolio (zsh) &mdash; 120&times;36</div>
+        <div class="terminal-status-badge">&bull; 0 warnings</div>
       </div>
+
+      <!-- Terminal Body -->
       <div class="terminal-body">
-        <div class="t-command"><span class="t-prompt">➜ ~</span> cat introduction.json</div>
-        <h1 class="hero-name">${escapeHtml(hero.headline || site.title)}</h1>
-        <div class="hero-tag">${escapeHtml(hero.tagline || 'Software Engineer')}</div>
-        <p class="hero-bio">${escapeHtml(hero.bio || site.description || '')}</p>
-        <div class="hero-links">
-          ${hero.primaryCta?.text ? `<a href="${sanitizeUrl(hero.primaryCta.url || '#projects')}" class="btn btn-primary">${escapeHtml(hero.primaryCta.text)}</a>` : '<a href="#projects" class="btn btn-primary">~/view-projects</a>'}
-          ${social.github ? `<a href="${sanitizeUrl(social.github)}" target="_blank" rel="noopener" class="btn btn-outline">GitHub</a>` : ''}
-          ${social.linkedin ? `<a href="${sanitizeUrl(social.linkedin)}" target="_blank" rel="noopener" class="btn btn-outline">LinkedIn</a>` : ''}
-          <a href="#contact" class="btn btn-outline">~/contact-me</a>
+        <!-- Command 1: whoami -->
+        <div class="cli-command-row">
+          <span class="cli-prompt">alex@edge-mesh</span>
+          <span class="cli-path">~</span>
+          <span class="cli-git">git:(<span style="color:#f78166;">main</span>)</span>
+          <span class="cli-cmd">$ whoami --verbose</span>
+        </div>
+
+        <div class="cli-output-block">
+          <h1 class="hero-name-big">${escapeHtml(hero.headline || site.title)}</h1>
+          <div class="hero-role-cli">&gt; ${escapeHtml(hero.tagline || 'Systems & Edge Platform Architect')}</div>
+          <p class="hero-bio-cli">${escapeHtml(hero.bio || site.description || 'Writing high-throughput distributed systems in Rust, TypeScript, and WebAssembly with sub-15ms global edge latency.')}</p>
+          <div class="cli-actions">
+            <a href="https://github.com/example" target="_blank" class="btn-cli btn-cli-primary">🐙 GitHub Profile</a>
+            <a href="mailto:${site.seo_config?.contactEmail || 'alex@example.dev'}" class="btn-cli">✉️ Send Message</a>
+            <a href="/feed.xml" class="btn-cli">📡 RSS Feed</a>
+          </div>
+        </div>
+
+        <!-- Command 2: list repositories -->
+        <div class="cli-command-row">
+          <span class="cli-prompt">alex@edge-mesh</span>
+          <span class="cli-path">~/projects</span>
+          <span class="cli-git">git:(<span style="color:#f78166;">main</span>)</span>
+          <span class="cli-cmd">$ ./list-repos.sh --featured --sort=stars</span>
+        </div>
+
+        <div class="cli-output-block">
+          <div class="repo-grid">
+            ${projects.length > 0 ? projects.map(proj => `
+              <div class="repo-card">
+                <div>
+                  <div class="repo-top">
+                    <a href="${sanitizeUrl(proj.githubUrl || proj.liveUrl || '#')}" target="_blank" class="repo-title">
+                      <span>📦 ${escapeHtml(proj.title)}</span>
+                    </a>
+                    <span class="repo-visibility">Public</span>
+                  </div>
+                  <p class="repo-desc">${escapeHtml(proj.description || '')}</p>
+                </div>
+                <div class="repo-meta">
+                  <span class="lang-pill">
+                    <span class="lang-dot" style="background:#dea584;"></span> Rust
+                  </span>
+                  <span>⭐ 1.2k</span>
+                  <span>🍴 184</span>
+                  <span>MIT</span>
+                </div>
+              </div>
+            `).join('') : `
+              <div class="repo-card">
+                <div>
+                  <div class="repo-top">
+                    <a href="https://github.com/example/edge-mesh" target="_blank" class="repo-title">
+                      <span>📦 edge-mesh-runtime</span>
+                    </a>
+                    <span class="repo-visibility">Public</span>
+                  </div>
+                  <p class="repo-desc">Microsecond distributed in-memory cache synchronizer and edge routing layer deployed across 300+ CDN points of presence.</p>
+                </div>
+                <div class="repo-meta">
+                  <span class="lang-pill"><span class="lang-dot" style="background:#dea584;"></span> Rust</span>
+                  <span>⭐ 2,840</span>
+                  <span>🍴 312</span>
+                  <span>MIT</span>
+                </div>
+              </div>
+
+              <div class="repo-card">
+                <div>
+                  <div class="repo-top">
+                    <a href="https://github.com/example/zero-runtime" target="_blank" class="repo-title">
+                      <span>📦 zero-runtime-compiler</span>
+                    </a>
+                    <span class="repo-visibility">Public</span>
+                  </div>
+                  <p class="repo-desc">Zero-hydration static HTML &amp; token compiler delivering 100/100 Lighthouse performance with pure semantic CSS.</p>
+                </div>
+                <div class="repo-meta">
+                  <span class="lang-pill"><span class="lang-dot" style="background:#3178c6;"></span> TypeScript</span>
+                  <span>⭐ 1,420</span>
+                  <span>🍴 190</span>
+                  <span>Apache-2.0</span>
+                </div>
+              </div>
+            `}
+          </div>
+        </div>
+
+        <!-- Command 3: cat stack -->
+        <div class="cli-command-row">
+          <span class="cli-prompt">alex@edge-mesh</span>
+          <span class="cli-path">~/config</span>
+          <span class="cli-cmd">$ cat environment.json</span>
+        </div>
+
+        <div class="cli-output-block">
+          <div class="json-box">{
+  <span class="json-key">"runtimes"</span>: [<span class="json-val">"Cloudflare Workers"</span>, <span class="json-val">"Node.js"</span>, <span class="json-val">"WebAssembly"</span>],
+  <span class="json-key">"languages"</span>: [<span class="json-val">"Rust"</span>, <span class="json-val">"TypeScript"</span>, <span class="json-val">"Go"</span>, <span class="json-val">"SQL"</span>],
+  <span class="json-key">"databases"</span>: [<span class="json-val">"PostgreSQL"</span>, <span class="json-val">"Cloudflare D1"</span>, <span class="json-val">"Redis"</span>],
+  <span class="json-key">"median_latency_ms"</span>: <span class="json-num">4.2</span>,
+  <span class="json-key">"lighthouse_score"</span>: <span class="json-num">100</span>
+}</div>
+        </div>
+
+        <!-- Command 4: career telemetry -->
+        <div class="cli-command-row">
+          <span class="cli-prompt">alex@edge-mesh</span>
+          <span class="cli-path">~</span>
+          <span class="cli-cmd">$ git log --oneline --graph -n 3</span>
+        </div>
+
+        ${experience.length > 0 ? `
+        <div class="cli-output-block">
+          ${experience.map(exp => `
+            <div class="exp-cli-item">
+              <div class="exp-cli-title">${escapeHtml(exp.role || exp.title || 'Staff Engineer')} &middot; ${escapeHtml(exp.company || 'Tech Labs')}</div>
+              <div class="exp-cli-meta">${escapeHtml(exp.period || exp.year || '2022 — Present')}</div>
+              <p class="exp-cli-desc">${escapeHtml(exp.description || '')}</p>
+            </div>
+          `).join('')}
+        </div>
+        ` : ''}
+
+        <!-- Command Bar Shortcuts -->
+        <div class="cmd-bar">
+          <div class="cmd-shortcuts">
+            <span>Quick Shortcuts:</span>
+            <a href="https://github.com/example" target="_blank" class="shortcut-pill">git remote -v</a>
+            <a href="mailto:${site.seo_config?.contactEmail || 'alex@example.dev'}" class="shortcut-pill">mail -s "hello"</a>
+            <span class="shortcut-pill" onclick="window.scrollTo({top:0, behavior:'smooth'})">clear &amp;&amp; top</span>
+          </div>
+          <div style="font-family:var(--font-mono); font-size:12px; color:var(--muted);">
+            TTY: /dev/pts/0 (utf-8)
+          </div>
         </div>
       </div>
     </div>
+  </div>
 
-    ${about.body ? `
-    <section class="section" id="about">
-      <div class="section-head">
-        <span class="section-prompt">01.</span>
-        <h2 class="section-title">About Me</h2>
-      </div>
-      <div class="prose">${renderSafeMarkdown(about.body)}</div>
-    </section>
-    ` : ''}
-
-    ${skills.length > 0 ? `
-    <section class="section" id="skills">
-      <div class="section-head">
-        <span class="section-prompt">02.</span>
-        <h2 class="section-title">Tech Stack & Languages</h2>
-      </div>
-      <div class="skills-container">
-        ${skills.map(s => `
-          <div class="skill-card">
-            <span class="lang-dot"></span>
-            <span>${escapeHtml(typeof s === 'string' ? s : s.name)}</span>
-          </div>
-        `).join('')}
-      </div>
-    </section>
-    ` : ''}
-
-    <section class="section" id="projects">
-      <div class="section-head">
-        <span class="section-prompt">03.</span>
-        <h2 class="section-title">Repositories &amp; Projects</h2>
-      </div>
-      <div class="projects-grid">
-        ${projects.length > 0 ? projects.map(p => `
-          <div class="project-card">
-            <div>
-              <h3 class="p-title">${escapeHtml(p.title)}</h3>
-              <p class="p-desc">${escapeHtml(p.description || '')}</p>
-            </div>
-            <div>
-              ${Array.isArray(p.tags) && p.tags.length > 0 ? `
-                <div class="p-tags">
-                  ${p.tags.map(t => `<span class="p-tag">${escapeHtml(t)}</span>`).join('')}
-                </div>
-              ` : ''}
-              <div class="p-links">
-                ${p.liveUrl ? `<a href="${sanitizeUrl(p.liveUrl)}" target="_blank" rel="noopener">⚡ Live Demo</a>` : ''}
-                ${p.githubUrl ? `<a href="${sanitizeUrl(p.githubUrl)}" target="_blank" rel="noopener">📂 Source</a>` : ''}
-              </div>
-            </div>
-          </div>
-        `).join('') : `
-          <div class="project-card">
-            <div>
-              <h3 class="p-title">edge-subdomain-router</h3>
-              <p class="p-desc">High-velocity edge routing layer resolving subdomains and static pages in under 15ms globally.</p>
-            </div>
-            <div>
-              <div class="p-tags"><span class="p-tag">TypeScript</span><span class="p-tag">Cloudflare Workers</span></div>
-              <div class="p-links"><a href="#projects">📂 Source Code</a></div>
-            </div>
-          </div>
-          <div class="project-card">
-            <div>
-              <h3 class="p-title">pure-static-compiler</h3>
-              <p class="p-desc">Zero-runtime static HTML engine producing 100/100 Lighthouse performance without client JavaScript bloat.</p>
-            </div>
-            <div>
-              <div class="p-tags"><span class="p-tag">HTML5</span><span class="p-tag">CSS3</span><span class="p-tag">Zero-JS</span></div>
-              <div class="p-links"><a href="#projects">📂 Source Code</a></div>
-            </div>
-          </div>
-        `}
-      </div>
-    </section>
-
-    <section class="section" id="experience">
-      <div class="section-head">
-        <span class="section-prompt">04.</span>
-        <h2 class="section-title">Experience &amp; Roles</h2>
-      </div>
-      <div class="exp-list">
-        ${experience.length > 0 ? experience.map(e => `
-          <div class="exp-card">
-            <div class="exp-top">
-              <span class="exp-role">${escapeHtml(e.role || '')} @ ${escapeHtml(e.company || '')}</span>
-              <span class="exp-period">${escapeHtml(e.period || '')}</span>
-            </div>
-            <p class="exp-desc">${escapeHtml(e.description || '')}</p>
-          </div>
-        `).join('') : `
-          <div class="exp-card">
-            <div class="exp-top">
-              <span class="exp-role">Staff Platform Engineer @ Cloud Scale Labs</span>
-              <span class="exp-period">2023 - Present</span>
-            </div>
-            <p class="exp-desc">Spearheading global edge computing infrastructure, CDN caching, and high-velocity developer tooling.</p>
-          </div>
-          <div class="exp-card">
-            <div class="exp-top">
-              <span class="exp-role">Senior Full-Stack Developer @ Modern Web Studio</span>
-              <span class="exp-period">2021 - 2023</span>
-            </div>
-            <p class="exp-desc">Engineered responsive web applications, design systems, and resilient cloud backend services.</p>
-          </div>
-        `}
-      </div>
-    </section>
-
-    <section class="section" id="contact">
-      <div class="section-head">
-        <span class="section-prompt">05.</span>
-        <h2 class="section-title">Ping / Contact</h2>
-      </div>
-      ${renderContactForm(site)}
-    </section>
-  </main>
-  ${renderFooter(site)}
   ${renderClientScript()}
 </body>
 </html>`;

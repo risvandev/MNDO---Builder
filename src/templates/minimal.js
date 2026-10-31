@@ -2,7 +2,7 @@
 // TEMPLATE 1: MINIMAL PORTFOLIO
 // Swiss typography, monochrome high-contrast, generous whitespace, clean layout.
 // ==============================================================================
-import { escapeHtml, sanitizeUrl, renderSafeMarkdown } from './sanitizer.js';
+import { escapeHtml, sanitizeUrl, sanitizeColor, renderSafeMarkdown } from './sanitizer.js';
 import { renderHead, renderNav, renderContactForm, renderFooter, renderClientScript, FONT_PAIRS } from './common.js';
 
 export function renderMinimal(siteData, currentPath = '/') {
@@ -17,7 +17,7 @@ export function renderMinimal(siteData, currentPath = '/') {
   const experience = content.experience || [];
   const education = content.education || [];
   const social = content.social || {};
-  const primaryColor = site.theme_config?.primaryColor || '#111827';
+  const primaryColor = sanitizeColor(site.theme_config?.primaryColor, '#111827');
   const fontPair = FONT_PAIRS[site.theme_config?.fontPair] || FONT_PAIRS['inter-outfit'];
 
   return `<!DOCTYPE html>
@@ -140,10 +140,11 @@ export function renderMinimal(siteData, currentPath = '/') {
     </section>
     ` : ''}
 
+    ${projects.length > 0 ? `
     <section class="section" id="projects">
       <h2 class="section-title">Selected Works</h2>
       <div class="projects-list">
-        ${projects.length > 0 ? projects.map(p => `
+        ${projects.map(p => `
           <div class="project-card">
             <h3 class="project-title">${escapeHtml(p.title)}</h3>
             <p class="project-desc">${escapeHtml(p.description || '')}</p>
@@ -157,27 +158,16 @@ export function renderMinimal(siteData, currentPath = '/') {
               ${p.githubUrl ? `<a href="${sanitizeUrl(p.githubUrl)}" target="_blank" rel="noopener">Source Code</a>` : ''}
             </div>
           </div>
-        `).join('') : `
-          <div class="project-card">
-            <h3 class="project-title">Edge Compute &amp; Cache Mesh</h3>
-            <p class="project-desc">A distributed micro-cache routing engine reducing latency to sub-15ms across global Cloudflare edge points of presence.</p>
-            <div class="project-tags"><span class="tag">Edge Computing</span><span class="tag">TypeScript</span><span class="tag">Cloudflare</span></div>
-            <div class="project-links"><a href="#projects">Visit Project &rarr;</a></div>
-          </div>
-          <div class="project-card">
-            <h3 class="project-title">Zero-Runtime Publishing Architecture</h3>
-            <p class="project-desc">Pure semantic HTML compiler and technical SEO pipeline generating instantaneous static output with zero client hydration overhead.</p>
-            <div class="project-tags"><span class="tag">HTML5</span><span class="tag">CSS Architecture</span><span class="tag">Performance</span></div>
-            <div class="project-links"><a href="#projects">Visit Project &rarr;</a></div>
-          </div>
-        `}
+        `).join('')}
       </div>
     </section>
+    ` : ''}
 
+    ${experience.length > 0 ? `
     <section class="section" id="experience">
       <h2 class="section-title">Experience</h2>
       <div class="timeline-list">
-        ${experience.length > 0 ? experience.map(e => `
+        ${experience.map(e => `
           <div class="timeline-item">
             <div class="timeline-meta">${escapeHtml(e.period || '')}</div>
             <div class="timeline-body">
@@ -186,26 +176,10 @@ export function renderMinimal(siteData, currentPath = '/') {
               <p class="timeline-desc">${escapeHtml(e.description || '')}</p>
             </div>
           </div>
-        `).join('') : `
-          <div class="timeline-item">
-            <div class="timeline-meta">2023 - Present</div>
-            <div class="timeline-body">
-              <div class="timeline-role">Staff Platform Engineer</div>
-              <div class="timeline-company">Cloud Scale Labs</div>
-              <p class="timeline-desc">Architecting distributed static generation systems and global edge routing infrastructure.</p>
-            </div>
-          </div>
-          <div class="timeline-item">
-            <div class="timeline-meta">2021 - 2023</div>
-            <div class="timeline-body">
-              <div class="timeline-role">Senior Full-Stack Developer</div>
-              <div class="timeline-company">Modern Web Studio</div>
-              <p class="timeline-desc">Engineered responsive web applications, design systems, and client interfaces.</p>
-            </div>
-          </div>
-        `}
+        `).join('')}
       </div>
     </section>
+    ` : ''}
 
     ${education.length > 0 ? `
     <section class="section" id="education">

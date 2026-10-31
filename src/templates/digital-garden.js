@@ -2,7 +2,7 @@
 // TEMPLATE 16: DIGITAL GARDEN & THOUGHT STREAM (QUARTZ & OBSIDIAN INSPIRED)
 // Designed for thinkers, researchers, and builders publishing living notes & ideas.
 // ==============================================================================
-import { escapeHtml, sanitizeUrl, renderSafeMarkdown } from './sanitizer.js';
+import { escapeHtml, sanitizeUrl, renderSafeMarkdown, sanitizeColor } from './sanitizer.js';
 import { renderHead, renderClientScript, FONT_PAIRS } from './common.js';
 
 export function renderDigitalGarden(siteData, currentPath = '/') {
@@ -11,7 +11,7 @@ export function renderDigitalGarden(siteData, currentPath = '/') {
   const posts = siteData.posts || [];
   const content = site.content || {};
   const hero = content.hero || {};
-  const primaryColor = site.theme_config?.primaryColor || '#059669'; // Emerald botanical
+  const primaryColor = sanitizeColor(site.theme_config?.primaryColor, '#059669'); // Emerald botanical
   const fontPair = FONT_PAIRS['inter-outfit'];
 
   // Check if viewing an individual garden note: /blog/:slug

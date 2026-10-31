@@ -97,3 +97,159 @@ export async function checkSubdomainAvailability(slug, currentSiteId = null) {
 
   return { available: true, slug: validation.normalized };
 }
+
+/**
+ * Normalize and deduplicate a blog post slug.
+ * Ensures lowercase, hyphenated, no leading/trailing hyphens, safe length, and unique within site.
+ * 
+ * @param {string} rawSlug
+ * @param {Array} existingPosts
+ * @param {string|null} currentPostId
+ * @returns {string}
+ */
+export function normalizeSlug(rawSlug, existingPosts = [], currentPostId = null) {
+  if (!rawSlug || typeof rawSlug !== 'string') {
+    rawSlug = 'post';
+  }
+
+  let cleaned = rawSlug
+    .trim()
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '') // remove accents
+    .replace(/[^a-z0-9]+/g, '-')     // replace invalid runs with hyphen
+    .replace(/^-+|-+$/g, '')         // trim hyphens
+    .slice(0, 48);
+
+  if (!cleaned) {
+    cleaned = 'post';
+  }
+
+  // Deduplicate against existing posts in this site
+  const otherSlugs = new Set(
+    (existingPosts || [])
+      .filter(p => {
+        if (!currentPostId) return true;
+        if (typeof p === 'object' && p !== null) return p.id !== currentPostId;
+        return p !== currentPostId;
+      })
+      .map(p => (typeof p === 'string' ? p : p?.slug || '').toLowerCase())
+  );
+
+  let candidate = cleaned;
+  let counter = 2;
+  while (otherSlugs.has(candidate)) {
+    candidate = `${cleaned}-${counter}`;
+    counter++;
+  }
+
+  return candidate;
+}
+
+/**
+ * Reserved internal paths that custom pages cannot claim.
+ */
+export const RESERVED_PAGE_PATHS = new Set([
+  '/',
+  '/blog',
+  '/dashboard',
+  '/editor',
+  '/preview',
+  '/templates',
+  '/settings',
+  '/auth',
+  '/api',
+  '/admin',
+  '/login',
+  '/logout',
+  '/register',
+  '/signin',
+  '/signup',
+  '/robots.txt',
+  '/sitemap.xml',
+  '/llms.txt',
+  '/manifest.webmanifest',
+  '/feed.xml'
+]);
+
+/**
+ * Validate and normalize a custom page URL path.
+ * 
+ * @param {string} rawPath
+ * @param {Array} existingPages
+ * @param {string|null} currentPageId
+ * @returns {{ valid: boolean, error?: string, path: string, normalized: string }}
+ */
+export function validatePagePath(rawPath, existingPages = [], currentPageId = null) {
+  if (!rawPath || typeof rawPath !== 'string') {
+    return { valid: false, error: 'Path is required (e.g. /about).', path: '', normalized: '' };
+  }
+
+  let trimmed = rawPath.trim().toLowerCase();
+  if (!trimmed.startsWith('/')) {
+    trimmed = '/' + trimmed;
+  }
+
+  // Remove trailing slash if longer than 1 character
+  if (trimmed.length > 1 && trimmed.endsWith('/')) {
+    trimmed = trimmed.replace(/\/+$/, '');
+  }
+
+  if (trimmed === '/') {
+    return { valid: false, error: 'The root path "/" is reserved for your homepage.', path: '/', normalized: '/' };
+  }
+
+  if (trimmed.includes('//')) {
+    return { valid: false, error: 'Path cannot contain consecutive slashes.', path: trimmed, normalized: trimmed };
+  }
+
+  if (trimmed.includes('?') || trimmed.includes('#') || trimmed.includes('\\') || /\s/.test(trimmed)) {
+    return { valid: false, error: 'Path cannot contain spaces, query parameters, or hash fragments.', path: trimmed, normalized: trimmed };
+  }
+
+  if (!/^\/[a-z0-9]+([a-z0-9\-_/]*[a-z0-9])?$/.test(trimmed)) {
+    return { valid: false, error: 'Path must only contain lowercase letters, numbers, hyphens, and slashes.', path: trimmed, normalized: trimmed };
+  }
+
+  if (RESERVED_PAGE_PATHS.has(trimmed) || trimmed.startsWith('/blog/')) {
+    return { valid: false, error: `Path "${trimmed}" is reserved by the template system.`, path: trimmed, normalized: trimmed };
+  }
+
+  // Check collision with other pages in this site
+  const duplicate = (existingPages || []).find(p => {
+    const existingPath = typeof p === 'string' ? p : p?.path;
+    const existingId = typeof p === 'object' && p !== null ? p.id : null;
+    if (currentPageId && existingId && existingId === currentPageId) return false;
+    if (currentPageId && typeof p === 'string' && currentPageId === p) return false;
+    return (existingPath || '').toLowerCase() === trimmed;
+  });
+
+  if (duplicate) {
+    return { valid: false, error: `A page with path "${trimmed}" already exists.`, path: trimmed, normalized: trimmed };
+  }
+
+  return { valid: true, path: trimmed, normalized: trimmed };
+}
+
+/**
+ * Validate brand color string format.
+ * @param {string} hex
+ * @returns {{ valid: boolean, normalized: string|null, error: string|null }}
+ */
+export function validatePrimaryColor(hex) {
+  if (!hex || typeof hex !== 'string') {
+    return { valid: false, normalized: null, error: 'Color is required.' };
+  }
+  let trimmed = hex.trim();
+  if (!trimmed.startsWith('#')) {
+    trimmed = '#' + trimmed;
+  }
+  const valid = /^#([0-9a-fA-F]{3}|[0-9a-fA-F]{4}|[0-9a-fA-F]{6}|[0-9a-fA-F]{8})$/.test(trimmed);
+  return {
+    valid,
+    normalized: valid ? trimmed.toLowerCase() : null,
+    error: valid ? null : 'Invalid color format. Please use a valid hex color code (e.g. #2563eb).'
+  };
+}
+
+

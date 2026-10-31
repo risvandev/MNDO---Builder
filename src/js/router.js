@@ -87,21 +87,29 @@ export async function handleRoute() {
   const appContainer = document.getElementById('app');
   if (!appContainer) return;
 
-  // Header & Footer visibility logic (Studio Editor has its own full-screen layout)
-  const isStudio = rawPath.startsWith('/editor/');
+  // Header & Footer visibility logic (Studio Editor & Developer Workbench have their own full-screen layouts)
+  const isFullscreen = rawPath.startsWith('/editor/') || rawPath === '/preview' || rawPath.startsWith('/preview/');
 
   // Clean mount container
   appContainer.innerHTML = '';
 
-  if (!isStudio) {
+  if (!isFullscreen) {
     appContainer.appendChild(createHeader());
   }
 
   const mainWrap = document.createElement('main');
-  mainWrap.className = 'main-content';
+  mainWrap.className = isFullscreen ? 'workbench-wrap' : 'main-content';
+  if (isFullscreen) {
+    mainWrap.style.margin = '0';
+    mainWrap.style.padding = '0';
+    mainWrap.style.width = '100vw';
+    mainWrap.style.height = '100vh';
+    mainWrap.style.maxWidth = '100vw';
+    mainWrap.style.overflow = 'hidden';
+  }
   appContainer.appendChild(mainWrap);
 
-  if (!isStudio) {
+  if (!isFullscreen) {
     appContainer.appendChild(createFooter());
   }
 
@@ -115,6 +123,8 @@ export async function handleRoute() {
     renderHomePage(mainWrap);
   } else if (rawPath === '/templates') {
     renderTemplatesCatalog(mainWrap);
+  } else if (rawPath === '/preview' || rawPath.startsWith('/preview/')) {
+    renderDevTemplateWorkbench(mainWrap, rawPath, queryString);
   } else if (rawPath === '/features') {
     renderFeaturesPage(mainWrap);
   } else if (rawPath === '/faq') {
@@ -668,47 +678,685 @@ function renderHomePage(container) {
 }
 
 // ------------------------------------------------------------------------------
+// TEMPLATE CATEGORIES REGISTRY & HELPERS
+// ------------------------------------------------------------------------------
+export const TEMPLATE_CATEGORIES = {
+  portfolio: {
+    id: 'portfolio',
+    label: 'Portfolios',
+    shortLabel: 'Portfolios',
+    icon: '💼',
+    badge: 'Portfolio',
+    desc: 'Crafted for developers, design engineers, scholars, researchers, and creative professionals.',
+    ids: [
+      'split-engineer',
+      'design-engineer',
+      'oss-maintainer',
+      'minimal',
+      'developer',
+      'interactive-resume',
+      'research-scholar',
+      'academic',
+      'visual-gallery',
+      'creative',
+      'professional',
+      'modern'
+    ]
+  },
+  blog: {
+    id: 'blog',
+    label: 'Writings & Thesis',
+    shortLabel: 'Writings',
+    icon: '✍️',
+    badge: 'Writing & Thesis',
+    desc: 'Typography-first reading experiences for thesis chapters, essays, digital gardens, and documentation.',
+    ids: [
+      'thesis-story',
+      'minimal-text',
+      'personal-blog',
+      'digital-garden',
+      'docs-book'
+    ]
+  },
+  business: {
+    id: 'business',
+    label: 'Landing Pages',
+    shortLabel: 'Landing Pages',
+    icon: '🚀',
+    badge: 'Landing Page',
+    desc: 'High-converting launchpads for indie products, micro-SaaS, agencies, and small businesses.',
+    ids: [
+      'product-launch',
+      'business'
+    ]
+  }
+};
+
+export function getTemplateCategoryKey(templateId) {
+  if (TEMPLATE_CATEGORIES.blog.ids.includes(templateId)) return 'blog';
+  if (TEMPLATE_CATEGORIES.business.ids.includes(templateId)) return 'business';
+  return 'portfolio';
+}
+
+export function getTemplateCategoryMeta(templateId) {
+  const key = getTemplateCategoryKey(templateId);
+  return TEMPLATE_CATEGORIES[key] || TEMPLATE_CATEGORIES.portfolio;
+}
+
+// ------------------------------------------------------------------------------
 // PAGE 2: TEMPLATES CATALOG
 // ------------------------------------------------------------------------------
 function renderTemplatesCatalog(container) {
+  const portfolioTemplates = TEMPLATES.filter(t => TEMPLATE_CATEGORIES.portfolio.ids.includes(t.id));
+  const writingTemplates = TEMPLATES.filter(t => TEMPLATE_CATEGORIES.blog.ids.includes(t.id));
+  const landingTemplates = TEMPLATES.filter(t => TEMPLATE_CATEGORIES.business.ids.includes(t.id));
+
   container.innerHTML = `
     <div class="app-container" style="padding-top:48px; padding-bottom:72px;">
       <div class="section-headline">
         <span class="section-tag">Template Catalog</span>
         <h1 class="section-title">Explore All Templates</h1>
-        <p class="section-desc">Each template is fully mobile-responsive and crafted for high visual appeal without requiring any coding.</p>
+        <p class="section-desc">Handcrafted, mobile-responsive, zero-runtime designs categorized into Portfolios, Writings &amp; Thesis, and Landing Pages.</p>
       </div>
 
-      <div style="display:grid; grid-template-columns:repeat(auto-fill, minmax(320px, 1fr)); gap:28px;">
-        ${TEMPLATES.map(t => `
-          <div class="card card-hover" style="display:flex; flex-direction:column; justify-content:space-between; background:#ffffff;">
-            <div>
-              <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;">
-                <span class="badge" style="background:var(--paper-soft); color:var(--muted); border:1px solid var(--line);">${t.category}</span>
-                <span style="font-size:12px; color:var(--muted-light); font-family:var(--font-mono);">ID: ${t.id}</span>
-              </div>
-              <h3 style="font-size:20px; font-weight:700; color:var(--ink); margin-bottom:8px;">${t.name}</h3>
-              <p style="font-size:14px; color:var(--muted); line-height:1.6; margin-bottom:16px;">${t.description}</p>
-              
-              <div style="margin-bottom:20px;">
-                <div style="font-size:11px; font-weight:700; color:var(--muted); text-transform:uppercase; letter-spacing:1px; margin-bottom:8px;">Key Features:</div>
-                <div style="display:flex; gap:6px; flex-wrap:wrap;">
-                  ${t.features.map(f => `<span style="font-size:11px; background:var(--paper-soft); color:var(--muted); padding:3px 10px; border-radius:var(--radius-full); border:1px solid var(--line);">${f}</span>`).join('')}
-                </div>
-              </div>
-            </div>
-
-            <div style="display:flex; gap:10px;">
-              <button class="btn btn-secondary btn-sm btn-preview-template" data-template="${t.id}" style="flex:1;">Live Preview</button>
-              <a href="/create?template=${t.id}" class="btn btn-primary btn-sm">Use Template</a>
-            </div>
+      <!-- Developer Workbench Quick-Launch Banner -->
+      <div style="background:var(--paper-soft); border:1px solid var(--line); border-radius:12px; padding:16px 22px; margin-bottom:32px; display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:14px; box-shadow:0 1px 3px rgba(0,0,0,0.02);">
+        <div>
+          <div style="display:flex; align-items:center; gap:8px;">
+            <span style="font-size:16px;">🛠️</span>
+            <span style="font-weight:700; font-size:14px; color:var(--ink);">Developer Template Workbench</span>
+            <span class="badge" style="background:#151515; color:#fff; font-size:10px; padding:1px 6px; border-radius:4px;">Live Preview Studio</span>
           </div>
-        `).join('')}
+          <p style="font-size:13px; color:var(--muted); margin:4px 0 0;">Inspect all 19 templates with separate category tabs and live Desktop, Tablet, and Mobile viewport switchers.</p>
+        </div>
+        <a href="/preview" class="btn btn-secondary btn-sm" style="font-size:13px; padding:7px 18px; font-weight:600;">
+          Open Workbench (/preview) &rarr;
+        </a>
       </div>
+
+      <!-- Category Filter Tabs -->
+      <div style="display:flex; justify-content:center; align-items:center; gap:10px; margin-bottom:40px; flex-wrap:wrap;">
+        <button class="catalog-tab-btn active" data-cat="all" style="padding:8px 20px; border-radius:999px; border:1px solid var(--ink); background:var(--ink); color:#ffffff; font-size:13px; font-weight:600; cursor:pointer; transition:all 0.15s ease;">
+          All Templates (${TEMPLATES.length})
+        </button>
+        <button class="catalog-tab-btn" data-cat="portfolio" style="padding:8px 20px; border-radius:999px; border:1px solid var(--line); background:#ffffff; color:var(--muted); font-size:13px; font-weight:600; cursor:pointer; transition:all 0.15s ease;">
+          💼 Portfolios (${portfolioTemplates.length})
+        </button>
+        <button class="catalog-tab-btn" data-cat="blog" style="padding:8px 20px; border-radius:999px; border:1px solid var(--line); background:#ffffff; color:var(--muted); font-size:13px; font-weight:600; cursor:pointer; transition:all 0.15s ease;">
+          ✍️ Writings &amp; Thesis (${writingTemplates.length})
+        </button>
+        <button class="catalog-tab-btn" data-cat="business" style="padding:8px 20px; border-radius:999px; border:1px solid var(--line); background:#ffffff; color:var(--muted); font-size:13px; font-weight:600; cursor:pointer; transition:all 0.15s ease;">
+          🚀 Landing Pages (${landingTemplates.length})
+        </button>
+      </div>
+
+      <!-- CATEGORY SECTION 1: PORTFOLIOS -->
+      <section id="catSectionPortfolio" style="margin-bottom:56px;">
+        <div style="display:flex; justify-content:space-between; align-items:flex-end; border-bottom:2px solid var(--line); padding-bottom:14px; margin-bottom:28px;">
+          <div>
+            <div style="display:flex; align-items:center; gap:8px;">
+              <span style="font-size:22px;">💼</span>
+              <h2 style="font-size:22px; font-weight:800; color:var(--ink); margin:0;">Portfolio Templates</h2>
+              <span class="badge" style="background:var(--paper-soft); color:var(--muted); border:1px solid var(--line); font-size:12px;">${portfolioTemplates.length} Designs</span>
+            </div>
+            <p style="font-size:14px; color:var(--muted); margin:4px 0 0;">Crafted for software engineers, designers, researchers, academics, and creative professionals.</p>
+          </div>
+          <a href="/preview?cat=portfolio" style="font-size:13px; font-weight:600; color:var(--ink); text-decoration:none;">Preview Portfolios &rarr;</a>
+        </div>
+
+        <div style="display:grid; grid-template-columns:repeat(auto-fill, minmax(320px, 1fr)); gap:28px;">
+          ${renderTemplateCatalogGrid(portfolioTemplates)}
+        </div>
+      </section>
+
+      <!-- CATEGORY SECTION 2: WRITINGS & THESIS -->
+      <section id="catSectionBlog" style="margin-bottom:56px;">
+        <div style="display:flex; justify-content:space-between; align-items:flex-end; border-bottom:2px solid var(--line); padding-bottom:14px; margin-bottom:28px;">
+          <div>
+            <div style="display:flex; align-items:center; gap:8px;">
+              <span style="font-size:22px;">✍️</span>
+              <h2 style="font-size:22px; font-weight:800; color:var(--ink); margin:0;">Writings &amp; Thesis Templates</h2>
+              <span class="badge" style="background:var(--paper-soft); color:var(--muted); border:1px solid var(--line); font-size:12px;">${writingTemplates.length} Designs</span>
+            </div>
+            <p style="font-size:14px; color:var(--muted); margin:4px 0 0;">Typography-first reading experiences for thesis chapters, serialized stories, digital gardens, and documentation.</p>
+          </div>
+          <a href="/preview?cat=blog" style="font-size:13px; font-weight:600; color:var(--ink); text-decoration:none;">Preview Writings &rarr;</a>
+        </div>
+
+        <div style="display:grid; grid-template-columns:repeat(auto-fill, minmax(320px, 1fr)); gap:28px;">
+          ${renderTemplateCatalogGrid(writingTemplates)}
+        </div>
+      </section>
+
+      <!-- CATEGORY SECTION 3: LANDING PAGES -->
+      <section id="catSectionBusiness" style="margin-bottom:40px;">
+        <div style="display:flex; justify-content:space-between; align-items:flex-end; border-bottom:2px solid var(--line); padding-bottom:14px; margin-bottom:28px;">
+          <div>
+            <div style="display:flex; align-items:center; gap:8px;">
+              <span style="font-size:22px;">🚀</span>
+              <h2 style="font-size:22px; font-weight:800; color:var(--ink); margin:0;">Landing Pages</h2>
+              <span class="badge" style="background:var(--paper-soft); color:var(--muted); border:1px solid var(--line); font-size:12px;">${landingTemplates.length} Designs</span>
+            </div>
+            <p style="font-size:14px; color:var(--muted); margin:4px 0 0;">High-converting launchpads for indie products, micro-SaaS, agencies, and small businesses.</p>
+          </div>
+          <a href="/preview?cat=business" style="font-size:13px; font-weight:600; color:var(--ink); text-decoration:none;">Preview Landing Pages &rarr;</a>
+        </div>
+
+        <div style="display:grid; grid-template-columns:repeat(auto-fill, minmax(320px, 1fr)); gap:28px;">
+          ${renderTemplateCatalogGrid(landingTemplates)}
+        </div>
+      </section>
     </div>
   `;
 
+  // Category tab button click events
+  const tabBtns = container.querySelectorAll('.catalog-tab-btn');
+  const secPortfolio = container.querySelector('#catSectionPortfolio');
+  const secBlog = container.querySelector('#catSectionBlog');
+  const secBusiness = container.querySelector('#catSectionBusiness');
+
+  tabBtns.forEach(btn => {
+    btn.addEventListener('click', () => {
+      const cat = btn.getAttribute('data-cat');
+      tabBtns.forEach(b => {
+        b.style.background = '#ffffff';
+        b.style.color = 'var(--muted)';
+        b.style.borderColor = 'var(--line)';
+        b.classList.remove('active');
+      });
+      btn.style.background = 'var(--ink)';
+      btn.style.color = '#ffffff';
+      btn.style.borderColor = 'var(--ink)';
+      btn.classList.add('active');
+
+      if (cat === 'all') {
+        secPortfolio.style.display = 'block';
+        secBlog.style.display = 'block';
+        secBusiness.style.display = 'block';
+      } else if (cat === 'portfolio') {
+        secPortfolio.style.display = 'block';
+        secBlog.style.display = 'none';
+        secBusiness.style.display = 'none';
+      } else if (cat === 'blog') {
+        secPortfolio.style.display = 'none';
+        secBlog.style.display = 'block';
+        secBusiness.style.display = 'none';
+      } else if (cat === 'business') {
+        secPortfolio.style.display = 'none';
+        secBlog.style.display = 'none';
+        secBusiness.style.display = 'block';
+      }
+    });
+  });
+
   attachTemplatePreviewButtons(container);
+}
+
+function renderTemplateCatalogGrid(templatesList) {
+  return templatesList.map(t => {
+    const catMeta = getTemplateCategoryMeta(t.id);
+    return `
+      <div class="card card-hover" style="display:flex; flex-direction:column; justify-content:space-between; background:#ffffff;">
+        <div>
+          <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;">
+            <div style="display:flex; align-items:center; gap:6px;">
+              <span class="badge" style="background:var(--paper-soft); color:var(--muted); border:1px solid var(--line);">
+                ${catMeta.icon} ${catMeta.badge}
+              </span>
+              <div style="width:8px; height:8px; border-radius:50%; background:${t.accentDefault};" title="Default accent color"></div>
+            </div>
+            <span style="font-size:12px; color:var(--muted-light); font-family:var(--font-mono);">${t.id}</span>
+          </div>
+          <h3 style="font-size:19px; font-weight:700; color:var(--ink); margin-bottom:8px;">${t.name}</h3>
+          <p style="font-size:13.5px; color:var(--muted); line-height:1.55; margin-bottom:16px;">${t.description}</p>
+          
+          <div style="margin-bottom:20px;">
+            <div style="font-size:10px; font-weight:700; color:var(--muted); text-transform:uppercase; letter-spacing:1px; margin-bottom:8px;">Key Features:</div>
+            <div style="display:flex; gap:6px; flex-wrap:wrap;">
+              ${t.features.map(f => `<span style="font-size:11px; background:var(--paper-soft); color:var(--muted); padding:3px 9px; border-radius:var(--radius-full); border:1px solid var(--line);">${f}</span>`).join('')}
+            </div>
+          </div>
+        </div>
+
+        <div>
+          <div style="display:flex; gap:8px; margin-bottom:8px;">
+            <button class="btn btn-secondary btn-sm btn-preview-template" data-template="${t.id}" style="flex:1;">
+              Live Preview
+            </button>
+            <a href="/preview/${t.id}" class="btn btn-outline btn-sm" style="font-size:12px; padding:6px 10px;" title="Inspect in Workbench with Desktop, Tablet, and Mobile viewports">
+              Workbench ↗
+            </a>
+          </div>
+          <a href="/create?template=${t.id}" class="btn btn-primary btn-sm" style="width:100%; justify-content:center;">
+            Use Template &rarr;
+          </a>
+        </div>
+      </div>
+    `;
+  }).join('');
+}
+
+/**
+ * Generates rich, realistic sample data tailored to each template's specific domain and aesthetic.
+ * @param {string} templateId
+ */
+export function getSampleTemplateData(templateId) {
+  const tmpl = TEMPLATES.find(t => t.id === templateId) || TEMPLATES[0];
+  const isBlog = ['personal-blog', 'thesis-story', 'minimal-text', 'digital-garden', 'docs-book'].includes(tmpl.id);
+  const isAcademic = ['academic', 'research-scholar'].includes(tmpl.id);
+  const isDeveloper = ['developer', 'oss-maintainer'].includes(tmpl.id);
+  const isDesignEngineer = ['design-engineer', 'creative', 'visual-gallery'].includes(tmpl.id);
+  const isStaff = ['split-engineer', 'modern', 'professional'].includes(tmpl.id);
+  const isResume = tmpl.id === 'interactive-resume';
+
+  if (isAcademic) {
+    return {
+      site: {
+        id: 'preview-site',
+        title: 'Dr. Elena Rostova',
+        description: 'Principal AI & Systems Research Scholar investigating distributed edge inference and foundation models.',
+        site_type: 'portfolio',
+        template_id: tmpl.id,
+        subdomain_slug: 'elena',
+        theme_config: { primaryColor: '#1e3a8a', fontPair: 'merriweather-roboto' },
+        seo_config: { contactEmail: 'elena.rostova@stanford.edu' },
+        content: {
+          hero: {
+            headline: 'Dr. Elena Rostova',
+            tagline: 'Principal AI & Systems Research Scientist',
+            bio: 'Investigating foundation models, distributed edge inference, and memory-bounded neural architectures across Stanford and Berkeley AI Lab.'
+          },
+          about: {
+            body: 'My laboratory investigates decentralized memory-bounded attention KV-cache synchronization across edge networks. We focus on sub-15ms edge compute, provable privacy bounds for distributed learning, and compiling transformers directly into static WebAssembly.'
+          },
+          skills: [
+            { name: 'Distributed Systems' },
+            { name: 'Edge AI Inference' },
+            { name: 'Model Compression' },
+            { name: 'Privacy-Preserving ML' },
+            { name: 'WebAssembly Runtimes' },
+            { name: 'Information Theory' }
+          ],
+          projects: [
+            {
+              title: 'Zero-Latency Attention Caching for Distributed Edge Inference',
+              description: 'We introduce a decentralized memory-bounded attention KV-cache synchronizer operating across edge cloud instances with sub-15ms latency guarantees.',
+              tags: ['NeurIPS 2024', 'Edge AI', 'Distributed Systems'],
+              liveUrl: 'https://example.edu/paper-1.pdf',
+              githubUrl: 'https://github.com/example/attention-cache'
+            },
+            {
+              title: 'Memory-Bounded Transformers for Zero-Runtime Edge Publishing',
+              description: 'Formalizing structural sparsity algorithms that compile multi-head attention weights directly into static WebAssembly representations.',
+              tags: ['ICML 2023', 'Spotlight', 'Sparse Models'],
+              liveUrl: 'https://example.edu/paper-2.pdf',
+              githubUrl: 'https://github.com/example/sparse-transformers'
+            },
+            {
+              title: 'Provable Privacy Bounds in Decentralized Edge Learning',
+              description: 'Theoretical framework establishing differential privacy guarantees in high-throughput federated mobile environments.',
+              tags: ['IEEE S&P', 'Differential Privacy', 'Federated ML'],
+              liveUrl: 'https://example.edu/paper-3.pdf',
+              githubUrl: 'https://github.com/example/provable-privacy'
+            }
+          ],
+          experience: [
+            {
+              role: 'Principal Research Scientist',
+              company: 'Stanford AI & Edge Systems Lab',
+              period: '2023 — Present',
+              description: 'Leading research on decentralized transformer caching and low-latency edge model distribution.'
+            },
+            {
+              role: 'Postdoctoral Research Fellow',
+              company: 'MIT CSAIL',
+              period: '2021 — 2023',
+              description: 'Researched sparse attention models and hardware acceleration for mobile edge nodes.'
+            }
+          ],
+          education: [
+            {
+              degree: 'Ph.D. in Computer Science',
+              institution: 'Stanford University · School of Engineering',
+              year: '2019 — 2023',
+              details: 'Dissertation: Decentralized Memory Models for High-Throughput Edge Networks. Stanford Graduate Fellow.'
+            },
+            {
+              degree: 'B.S. in EECS (Summa Cum Laude)',
+              institution: 'Massachusetts Institute of Technology (MIT)',
+              year: '2015 — 2019',
+              details: 'Undergraduate Research Opportunities Program (UROP) fellow in CSAIL.'
+            }
+          ],
+          contact: { enableForm: true, heading: 'Office Hours & Inquiries' }
+        }
+      },
+      pages: [],
+      posts: []
+    };
+  }
+
+  if (isDeveloper) {
+    return {
+      site: {
+        id: 'preview-site',
+        title: 'Kaelen Chen',
+        description: 'Systems & Open Source Toolmaker writing high-throughput distributed networks in Rust and Go.',
+        site_type: 'portfolio',
+        template_id: tmpl.id,
+        subdomain_slug: 'kaelen',
+        theme_config: { primaryColor: '#10b981', fontPair: 'jetbrains-inter' },
+        seo_config: { contactEmail: 'kaelen@systems.dev' },
+        content: {
+          hero: {
+            headline: 'Kaelen Chen',
+            tagline: 'Systems & Open Source Toolmaker',
+            bio: 'Writing high-throughput distributed systems, terminal developer tools, and microsecond edge proxies in Rust, Go, and WebAssembly.'
+          },
+          about: {
+            body: 'Focusing on low-level Linux systems engineering, sub-millisecond network socket proxies, zero-copy memory pipelines, and zero-runtime static site compilers.'
+          },
+          skills: [
+            { name: 'Rust' },
+            { name: 'Go' },
+            { name: 'TypeScript' },
+            { name: 'Linux eBPF' },
+            { name: 'Cloudflare Workers' },
+            { name: 'WebAssembly' },
+            { name: 'PostgreSQL' },
+            { name: 'Neovim' }
+          ],
+          projects: [
+            {
+              title: 'edge-mesh-runtime',
+              description: 'Microsecond distributed in-memory cache synchronizer and edge routing layer deployed across 300+ CDN points of presence.',
+              tags: ['Rust', 'WebAssembly', 'Edge KV', 'Stars: 2.8k'],
+              liveUrl: 'https://github.com/example/edge-mesh',
+              githubUrl: 'https://github.com/example/edge-mesh'
+            },
+            {
+              title: 'zero-runtime-compiler',
+              description: 'Zero-hydration static HTML & CSS token compiler delivering 100/100 Lighthouse performance without client JavaScript overhead.',
+              tags: ['TypeScript', 'Compiler', 'CSS Architecture', 'Stars: 1.4k'],
+              liveUrl: 'https://github.com/example/zero-runtime',
+              githubUrl: 'https://github.com/example/zero-runtime'
+            },
+            {
+              title: 'packet-telemetry-cli',
+              description: 'High-speed terminal TUI for visualizing streaming network packet distribution and latency percentiles in real time.',
+              tags: ['Go', 'TUI', 'Networking', 'Stars: 890'],
+              liveUrl: 'https://github.com/example/telemetry',
+              githubUrl: 'https://github.com/example/telemetry'
+            }
+          ],
+          experience: [
+            {
+              role: 'Principal Systems Architect',
+              company: 'TechEdge Labs · Core Infrastructure',
+              period: '2023 — Present',
+              description: 'Designed microsecond edge cache replication across global CDN nodes; eliminated 95% of origin database roundtrips.'
+            },
+            {
+              role: 'Senior Linux Systems Engineer',
+              company: 'CloudScale Networks',
+              period: '2020 — 2023',
+              description: 'Maintained high-throughput eBPF socket filters and distributed message routing backbones.'
+            }
+          ],
+          education: [
+            {
+              degree: 'B.S. in Computer Systems & Architecture',
+              institution: 'Polytechnic Institute',
+              year: '2016 — 2020',
+              details: 'Core research in OS kernel internals, memory management, and distributed networking.'
+            }
+          ],
+          contact: { enableForm: true, heading: 'TTY Ping' }
+        }
+      },
+      pages: [],
+      posts: []
+    };
+  }
+
+  if (isDesignEngineer) {
+    return {
+      site: {
+        id: 'preview-site',
+        title: 'Marcus Vance',
+        description: 'Design Engineer & Product Craft crafting tactile digital surfaces and zero-runtime systems.',
+        site_type: 'portfolio',
+        template_id: tmpl.id,
+        subdomain_slug: 'marcus',
+        theme_config: { primaryColor: '#6366f1', fontPair: 'inter-outfit' },
+        seo_config: { contactEmail: 'marcus@craft.design' },
+        content: {
+          hero: {
+            headline: 'Marcus Vance',
+            tagline: 'Design Engineer & Product Craft',
+            bio: 'Designing tactile web interfaces, micro-interactions, and zero-runtime design systems. Bridging high-level visual polish with low-level systems speed.'
+          },
+          about: {
+            body: 'I believe true product craft is subtractive. By eliminating framework runtime bloat and engineering semantic HTML with tactile typography and 60 FPS CSS micro-animations, digital tools feel instant and delightful.'
+          },
+          skills: [
+            { name: 'Design Tokens' },
+            { name: 'CSS Architecture' },
+            { name: 'Tactile Typography' },
+            { name: 'WebGL & Canvas' },
+            { name: 'TypeScript' },
+            { name: 'Performance Tuning' }
+          ],
+          projects: [
+            {
+              title: 'Linear-Style Bento Architecture',
+              description: '12-column bento grid design system with tactile card interactions, micro-borders, and +340% conversion metrics.',
+              tags: ['Design System', 'Bento Grid', 'CSS', 'Case Study'],
+              liveUrl: 'https://example.com/bento',
+              githubUrl: 'https://github.com/example/bento'
+            },
+            {
+              title: 'Zero-Runtime Kinetic Shaders',
+              description: 'Hardware-accelerated CSS and Canvas shader engine rendering silky smooth 60 FPS visual telemetry with zero battery penalty.',
+              tags: ['WebGL', 'Canvas', 'Performance', '60 FPS'],
+              liveUrl: 'https://example.com/shaders',
+              githubUrl: 'https://github.com/example/shaders'
+            }
+          ],
+          experience: [
+            {
+              role: 'Principal Design Engineer',
+              company: 'Modern Craft Studio',
+              period: '2023 — Present',
+              description: 'Leading design systems, micro-interactions, and high-velocity frontend architecture for venture-backed products.'
+            },
+            {
+              role: 'Staff Frontend Architect',
+              company: 'Linear Ecosystem Lab',
+              period: '2021 — 2023',
+              description: 'Designed accessible token compilers and responsive desktop/mobile interfaces for 100k+ users.'
+            }
+          ],
+          education: [
+            {
+              degree: 'B.F.A. in Interactive Design & Computational Media',
+              institution: 'School of Design & Tech',
+              year: '2017 — 2021',
+              details: 'Specialization in typography, human-computer interaction, and design systems.'
+            }
+          ],
+          contact: { enableForm: true, heading: 'Start a Craft Inquiry' }
+        }
+      },
+      pages: [],
+      posts: []
+    };
+  }
+
+  if (isStaff || isResume) {
+    return {
+      site: {
+        id: 'preview-site',
+        title: 'Alex Rivera',
+        description: 'Staff Platform Architect specializing in distributed edge runtimes, zero-runtime architecture, and high-throughput systems.',
+        site_type: 'portfolio',
+        template_id: tmpl.id,
+        subdomain_slug: 'alex',
+        theme_config: { primaryColor: '#64ffda', fontPair: 'jetbrains-inter' },
+        seo_config: { contactEmail: 'alex.rivera@edge-mesh.com' },
+        content: {
+          hero: {
+            headline: 'Alex Rivera',
+            tagline: 'Staff Platform Architect & Principal Systems Lead',
+            bio: 'Designing microsecond edge routing, distributed caching systems, and high-velocity web infrastructure serving 50M+ requests with sub-15ms response latency.'
+          },
+          about: {
+            body: 'Over 8 years specializing in high-throughput distributed infrastructure, zero-runtime frontend architecture, and resilient cloud engineering. Focused on sub-15ms edge latency, zero-hydration markup, and tactile typography.'
+          },
+          skills: [
+            { name: 'TypeScript' },
+            { name: 'Cloudflare Workers' },
+            { name: 'Distributed Systems' },
+            { name: 'Rust' },
+            { name: 'PostgreSQL' },
+            { name: 'WebAssembly' },
+            { name: 'Performance Tuning' },
+            { name: 'Git & CI/CD' }
+          ],
+          projects: [
+            {
+              title: 'High-Velocity Edge Mesh',
+              description: 'A global microsecond edge routing and static delivery engine serving 50M+ requests with sub-15ms response latency.',
+              tags: ['Cloudflare Workers', 'Edge Computing', 'Rust'],
+              liveUrl: 'https://example.com',
+              githubUrl: 'https://github.com/example/edge-mesh'
+            },
+            {
+              title: 'Zero-Runtime Design Architecture',
+              description: 'Pure semantic HTML compiler and CSS token system producing zero hydration overhead and 100/100 Lighthouse performance.',
+              tags: ['HTML5', 'CSS Architecture', 'Performance'],
+              liveUrl: 'https://example.com',
+              githubUrl: 'https://github.com/example/zero-runtime'
+            },
+            {
+              title: 'Real-Time Telemetry Shaders',
+              description: 'Hardware-accelerated WebGL dashboard visualizing high-throughput streaming metrics with 60 FPS silky smooth rendering.',
+              tags: ['WebGL', 'Canvas', 'TypeScript'],
+              liveUrl: 'https://example.com',
+              githubUrl: 'https://github.com/example/telemetry'
+            }
+          ],
+          experience: [
+            {
+              role: 'Principal Platform Architect',
+              company: 'TechEdge Labs',
+              period: '2023 — Present',
+              description: 'Leading global edge infrastructure, high-throughput static publishing systems, and developer productivity tooling.'
+            },
+            {
+              role: 'Senior Full-Stack Engineer',
+              company: 'Modern Web Studio',
+              period: '2021 — 2023',
+              description: 'Designed accessible design systems, resilient cloud backends, and responsive user interfaces.'
+            }
+          ],
+          education: [
+            {
+              degree: 'B.S. in Computer Science & Systems Architecture',
+              institution: 'Institute of Technology',
+              year: '2017 — 2021',
+              details: 'Magna Cum Laude. Specialization in distributed computing, networking protocols, and systems performance.'
+            }
+          ],
+          contact: { enableForm: true, heading: "Let's connect" }
+        }
+      },
+      pages: [],
+      posts: []
+    };
+  }
+
+  // Fallback for blogs / default
+  return {
+    site: {
+      id: 'preview-site',
+      title: `${tmpl.name}`,
+      description: tmpl.description,
+      site_type: isBlog ? 'blog' : 'portfolio',
+      template_id: tmpl.id,
+      subdomain_slug: 'demo',
+      theme_config: { primaryColor: tmpl.accentDefault, fontPair: 'inter-outfit' },
+      seo_config: {},
+      content: {
+        hero: {
+          headline: isBlog ? 'Writings & Computational Notes' : 'Alex Morgan',
+          tagline: isBlog ? 'Essays on distributed systems, memory models, and digital craft.' : 'Design Engineer & Platform Architect',
+          bio: isBlog
+            ? 'Publishing unhurried inquiries into systems architecture, philosophy of technology, and computational aesthetics.'
+            : 'Designing high-velocity platforms, zero-runtime frontend architectures, and distributed edge systems.'
+        },
+        about: {
+          body: isBlog
+            ? 'I write long-form thesis explorations and field notes on system design. Every piece of writing here is compiled statically and distributed across global edge nodes.'
+            : 'Over 7 years specializing in high-throughput distributed infrastructure and minimalist web interfaces.'
+        },
+        skills: [
+          { name: 'Distributed Systems' },
+          { name: 'Cloudflare Workers' },
+          { name: 'TypeScript' },
+          { name: 'CSS Tokens' },
+          { name: 'Performance' }
+        ],
+        projects: [
+          {
+            title: 'High-Velocity Edge Mesh',
+            description: 'Global microsecond edge routing and static delivery engine serving 50M+ requests with sub-15ms response latency.',
+            tags: ['Cloudflare Workers', 'Edge Computing', 'Rust'],
+            liveUrl: 'https://example.com',
+            githubUrl: 'https://github.com/example/edge-mesh'
+          }
+        ],
+        experience: [
+          {
+            role: 'Principal Architect',
+            company: 'TechEdge Labs',
+            period: '2023 — Present',
+            description: 'Leading global edge infrastructure and developer tooling.'
+          }
+        ],
+        education: [
+          {
+            degree: 'B.S. in Computer Science',
+            institution: 'Institute of Technology',
+            year: '2017 — 2021',
+            details: 'Distributed computing and networking.'
+          }
+        ],
+        contact: { enableForm: true, heading: "Let's connect" }
+      }
+    },
+    pages: [],
+    posts: [
+      {
+        id: 'post-1',
+        slug: 'prologue-origins-of-inquiry',
+        title: 'Prologue: Origins of the Inquiry',
+        excerpt: 'An investigation into fundamental computational constraints and memory architecture.',
+        body_markdown: '## The Architecture of Mind\n\nEvery computational inquiry begins with a boundary constraint.\n\n> "Structure defines possibility, and constraints yield elegance."\n\n### Foundations\n\nIn this opening chapter, we formalize the premise and trace its antecedents through historical literature.',
+        published_at: new Date().toISOString(),
+        status: 'published'
+      },
+      {
+        id: 'post-2',
+        slug: 'chapter-one-empirical-frontiers',
+        title: 'Chapter 1: Empirical Frontiers',
+        excerpt: 'Systematic observation across edge deployment environments and latency distribution curves.',
+        body_markdown: '## Empirical Observations\n\nBenchmarking edge nodes reveals unexpected patterns in packet propagation.\n\n* Phase 1: Cold start latency reduction\n* Phase 2: Distributed memory synchronization\n* Phase 3: Global cache invalidation',
+        published_at: new Date().toISOString(),
+        status: 'published'
+      }
+    ]
+  };
 }
 
 function attachTemplatePreviewButtons(container) {
@@ -718,111 +1366,26 @@ function attachTemplatePreviewButtons(container) {
       const tmpl = TEMPLATES.find(t => t.id === templateId);
       if (!tmpl) return;
 
-      const mockData = {
-        site: {
-          id: 'preview-site',
-          title: `${tmpl.name} Demo`,
-          description: tmpl.description,
-          site_type: templateId === 'personal-blog' || templateId === 'thesis-story' ? 'blog' : 'portfolio',
-          template_id: templateId,
-          subdomain_slug: 'demo',
-          theme_config: { primaryColor: tmpl.accentDefault, fontPair: 'inter-outfit' },
-          seo_config: {},
-          content: {
-            hero: {
-              headline: 'Alex Morgan',
-              tagline: 'Writer, Researcher & Platform Architect',
-              bio: 'Passionate about crafting fast, resilient systems and writing thoughtful computational research.'
-            },
-            about: {
-              body: '6+ years designing scalable systems and publishing open research. Exploring distributed databases, edge networks, and modern UI engineering.'
-            },
-            skills: [
-              { name: 'TypeScript' },
-              { name: 'Cloudflare Workers' },
-              { name: 'Distributed Systems' },
-              { name: 'PostgreSQL' },
-              { name: 'WebAssembly' },
-              { name: 'Design Systems' }
-            ],
-            projects: [
-              {
-                title: 'High-Velocity Edge Mesh',
-                description: 'A global microsecond edge routing and static delivery engine serving 50M+ requests with sub-15ms response latency.',
-                tags: ['Cloudflare Workers', 'Edge Computing', 'Rust'],
-                liveUrl: 'https://example.com',
-                githubUrl: 'https://github.com/example/edge-mesh'
-              },
-              {
-                title: 'Zero-Runtime Design Architecture',
-                description: 'Pure semantic HTML compiler and CSS token system producing zero hydration overhead and 100/100 Lighthouse performance.',
-                tags: ['HTML5', 'CSS Architecture', 'Performance'],
-                liveUrl: 'https://example.com',
-                githubUrl: 'https://github.com/example/zero-runtime'
-              },
-              {
-                title: 'Real-Time Telemetry Shaders',
-                description: 'Hardware-accelerated WebGL dashboard visualizing high-throughput streaming metrics with 60 FPS silky smooth rendering.',
-                tags: ['WebGL', 'Canvas', 'TypeScript'],
-                liveUrl: 'https://example.com',
-                githubUrl: 'https://github.com/example/telemetry'
-              }
-            ],
-            experience: [
-              {
-                role: 'Principal Platform Architect',
-                company: 'TechEdge Labs',
-                period: '2023 - Present',
-                description: 'Leading global edge infrastructure, high-throughput static publishing systems, and developer productivity tooling.'
-              },
-              {
-                role: 'Senior Full-Stack Engineer',
-                company: 'Modern Web Studio',
-                period: '2021 - 2023',
-                description: 'Designed accessible design systems, resilient cloud backends, and responsive user interfaces.'
-              }
-            ],
-            education: [
-              {
-                degree: 'B.S. in Computer Science & Systems',
-                institution: 'Institute of Technology',
-                year: '2017 - 2021',
-                details: 'Specialization in distributed computing, networking protocols, and systems performance.'
-              }
-            ],
-            contact: { enableForm: true, heading: "Let's connect" }
-          }
-        },
-        pages: [],
-        posts: [
-          {
-            id: 'post-1',
-            slug: 'prologue-origins-of-inquiry',
-            title: 'Prologue: Origins of the Inquiry',
-            excerpt: 'An investigation into fundamental computational constraints and memory architecture.',
-            body_markdown: '## The Architecture of Mind\n\nEvery computational inquiry begins with a boundary constraint.\n\n> "Structure defines possibility, and constraints yield elegance."\n\n### Foundations\n\nIn this opening chapter, we formalize the premise and trace its antecedents through historical literature.',
-            published_at: new Date().toISOString(),
-            status: 'published'
-          },
-          {
-            id: 'post-2',
-            slug: 'chapter-one-empirical-frontiers',
-            title: 'Chapter 1: Empirical Frontiers',
-            excerpt: 'Systematic observation across edge deployment environments and latency distribution curves.',
-            body_markdown: '## Empirical Observations\n\nBenchmarking edge nodes reveals unexpected patterns in packet propagation.\n\n* Phase 1: Cold start latency reduction\n* Phase 2: Distributed memory synchronization\n* Phase 3: Global cache invalidation',
-            published_at: new Date().toISOString(),
-            status: 'published'
-          }
-        ]
-      };
-
+      const mockData = getSampleTemplateData(templateId);
       const html = renderSite(mockData, '/').body;
+      const catMeta = getTemplateCategoryMeta(templateId);
 
       openModal({
         title: `Preview: ${tmpl.name}`,
         contentHtml: `
-          <div style="width:100%; height:520px; border-radius:8px; overflow:hidden; border:1px solid var(--border-subtle); background:#fff;">
-            <iframe id="modalPreviewIframe" style="width:100%; height:100%; border:none;" sandbox="allow-scripts allow-same-origin"></iframe>
+          <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px; padding:0 2px;">
+            <div style="display:flex; align-items:center; gap:8px;">
+              <span class="badge" style="background:var(--paper-soft); color:var(--ink); border:1px solid var(--line); font-size:12px;">
+                ${catMeta.icon} ${catMeta.label}
+              </span>
+              <span style="font-size:12px; color:var(--muted); font-family:var(--font-mono);">${tmpl.id}</span>
+            </div>
+            <a href="/preview/${tmpl.id}" target="_blank" class="btn btn-secondary btn-sm" style="font-size:12px; padding:4px 12px; text-decoration:none;">
+              Open in Workbench ↗
+            </a>
+          </div>
+          <div style="width:100%; height:520px; border-radius:8px; overflow:hidden; border:1px solid var(--line); background:#fff;">
+            <iframe id="modalPreviewIframe" style="width:100%; height:100%; border:none; display:block;" sandbox="allow-scripts allow-same-origin"></iframe>
           </div>
         `,
         cancelText: 'Close'
@@ -834,6 +1397,326 @@ function attachTemplatePreviewButtons(container) {
       }, 50);
     });
   });
+}
+
+// ------------------------------------------------------------------------------
+// DEVELOPER TEMPLATE WORKBENCH (/preview and /preview/:templateId)
+// ------------------------------------------------------------------------------
+export function renderDevTemplateWorkbench(container, rawPath, queryString) {
+  const params = new URLSearchParams(queryString || (window.location.search ? window.location.search.slice(1) : ''));
+  
+  let initialTemplateId = 'split-engineer';
+  if (rawPath.startsWith('/preview/')) {
+    const slug = rawPath.replace('/preview/', '').split('/')[0].split('?')[0];
+    if (slug) initialTemplateId = slug;
+  } else if (params.get('template')) {
+    initialTemplateId = params.get('template');
+  }
+
+  // Pre-grouped templates
+  const portfolioTemplates = TEMPLATES.filter(t => TEMPLATE_CATEGORIES.portfolio.ids.includes(t.id));
+  const writingTemplates = TEMPLATES.filter(t => TEMPLATE_CATEGORIES.blog.ids.includes(t.id));
+  const landingTemplates = TEMPLATES.filter(t => TEMPLATE_CATEGORIES.business.ids.includes(t.id));
+
+  // Category state: 'all' | 'portfolio' | 'blog' | 'business'
+  let currentCategory = params.get('cat') || getTemplateCategoryKey(initialTemplateId) || 'all';
+  if (currentCategory !== 'all' && !TEMPLATE_CATEGORIES[currentCategory]?.ids.includes(initialTemplateId)) {
+    currentCategory = getTemplateCategoryKey(initialTemplateId);
+  }
+
+  let currentTemplateIndex = TEMPLATES.findIndex(t => t.id === initialTemplateId);
+  if (currentTemplateIndex === -1) currentTemplateIndex = 0;
+  let currentViewport = 'desktop'; // 'desktop' | 'tablet' | 'mobile'
+
+  function getActiveCategoryTemplates() {
+    if (currentCategory === 'all') return TEMPLATES;
+    if (currentCategory === 'portfolio') return portfolioTemplates;
+    if (currentCategory === 'blog') return writingTemplates;
+    if (currentCategory === 'business') return landingTemplates;
+    return TEMPLATES;
+  }
+
+  container.innerHTML = `
+    <div style="display:flex; flex-direction:column; height:100vh; width:100vw; overflow:hidden; background:#0f0f0f; color:#f0f0f0; font-family:var(--font-sans);">
+      <!-- Top Control Bar (54px) -->
+      <header style="height:54px; background:#181818; border-bottom:1px solid #282828; display:flex; align-items:center; justify-content:space-between; padding:0 16px; z-index:20; flex-shrink:0; gap:12px;">
+        <!-- Left: Brand & Category Tabs -->
+        <div style="display:flex; align-items:center; gap:14px; min-width:0;">
+          <a href="/templates" style="display:flex; align-items:center; gap:8px; text-decoration:none; color:#f0f0f0; flex-shrink:0;">
+            <div class="brand-icon" style="width:28px; height:28px; font-size:13px; border-radius:6px;">M</div>
+            <span style="font-weight:700; font-size:14px; letter-spacing:-0.02em;">Preview Workbench</span>
+          </a>
+
+          <div style="height:18px; width:1px; background:#333; flex-shrink:0;"></div>
+
+          <!-- Category Filter Tabs -->
+          <div style="display:flex; align-items:center; gap:3px; background:#222; padding:3px; border-radius:8px; border:1px solid #333; flex-shrink:0;">
+            <button class="wb-cat-btn ${currentCategory === 'all' ? 'active' : ''}" data-cat="all" style="padding:4px 10px; font-size:12px; font-weight:600; border-radius:6px; border:none; cursor:pointer; background:${currentCategory === 'all' ? '#383838' : 'transparent'}; color:${currentCategory === 'all' ? '#fff' : '#aaa'}; transition:all 0.15s ease;">
+              All (${TEMPLATES.length})
+            </button>
+            <button class="wb-cat-btn ${currentCategory === 'portfolio' ? 'active' : ''}" data-cat="portfolio" style="padding:4px 10px; font-size:12px; font-weight:600; border-radius:6px; border:none; cursor:pointer; background:${currentCategory === 'portfolio' ? '#383838' : 'transparent'}; color:${currentCategory === 'portfolio' ? '#fff' : '#aaa'}; transition:all 0.15s ease;">
+              💼 Portfolios (${portfolioTemplates.length})
+            </button>
+            <button class="wb-cat-btn ${currentCategory === 'blog' ? 'active' : ''}" data-cat="blog" style="padding:4px 10px; font-size:12px; font-weight:600; border-radius:6px; border:none; cursor:pointer; background:${currentCategory === 'blog' ? '#383838' : 'transparent'}; color:${currentCategory === 'blog' ? '#fff' : '#aaa'}; transition:all 0.15s ease;">
+              ✍️ Writings (${writingTemplates.length})
+            </button>
+            <button class="wb-cat-btn ${currentCategory === 'business' ? 'active' : ''}" data-cat="business" style="padding:4px 10px; font-size:12px; font-weight:600; border-radius:6px; border:none; cursor:pointer; background:${currentCategory === 'business' ? '#383838' : 'transparent'}; color:${currentCategory === 'business' ? '#fff' : '#aaa'}; transition:all 0.15s ease;">
+              🚀 Landing (${landingTemplates.length})
+            </button>
+          </div>
+        </div>
+
+        <!-- Center: Responsive Viewport Switcher -->
+        <div style="display:flex; align-items:center; gap:3px; background:#222; padding:3px; border-radius:8px; border:1px solid #333; flex-shrink:0;">
+          <button id="wbVpDesktop" class="btn btn-sm ${currentViewport === 'desktop' ? 'btn-primary' : 'btn-outline'}" style="padding:4px 12px; font-size:12px; border:none;" title="Desktop View (100%)">
+            🖥️ Desktop
+          </button>
+          <button id="wbVpTablet" class="btn btn-sm ${currentViewport === 'tablet' ? 'btn-primary' : 'btn-outline'}" style="padding:4px 12px; font-size:12px; border:none;" title="Tablet View (768px)">
+            📱 Tablet
+          </button>
+          <button id="wbVpMobile" class="btn btn-sm ${currentViewport === 'mobile' ? 'btn-primary' : 'btn-outline'}" style="padding:4px 12px; font-size:12px; border:none;" title="Mobile View (375px)">
+            📱 Mobile
+          </button>
+        </div>
+
+        <!-- Right: Actions -->
+        <div style="display:flex; align-items:center; gap:8px; flex-shrink:0;">
+          <button id="wbBtnOpenRaw" class="btn btn-outline btn-sm" style="color:#aaa; border-color:#383838; padding:5px 12px; font-size:12px; background:#222;" title="Open in Clean Standalone Tab">
+            ↗ New Tab
+          </button>
+          <a id="wbBtnUse" href="/create?template=${TEMPLATES[currentTemplateIndex].id}" class="btn btn-primary btn-sm" style="padding:6px 14px; font-size:12px; font-weight:600;">
+            Use Template &rarr;
+          </a>
+        </div>
+      </header>
+
+      <!-- Sub-Header: Template Switcher & Category Chip Strip (42px) -->
+      <div style="height:42px; background:#121212; border-bottom:1px solid #242424; display:flex; align-items:center; justify-content:space-between; padding:0 16px; z-index:19; flex-shrink:0; gap:14px;">
+        <!-- Left: Navigation Arrows & Optgroup Dropdown -->
+        <div style="display:flex; align-items:center; gap:8px; flex-shrink:0;">
+          <div style="display:flex; align-items:center; gap:4px;">
+            <button id="wbBtnPrev" class="btn btn-sm btn-outline" style="padding:3px 8px; color:#ddd; border-color:#333; font-size:11px; background:#1e1e1e;" title="Previous in Category (Left Arrow)">◀</button>
+            <button id="wbBtnNext" class="btn btn-sm btn-outline" style="padding:3px 8px; color:#ddd; border-color:#333; font-size:11px; background:#1e1e1e;" title="Next in Category (Right Arrow)">▶</button>
+          </div>
+
+          <select id="wbTemplateSelect" style="background:#1e1e1e; color:#fff; border:1px solid #333; border-radius:6px; padding:4px 10px; font-size:12px; font-weight:500; outline:none; cursor:pointer;">
+            <optgroup label="💼 Portfolios (${portfolioTemplates.length})">
+              ${portfolioTemplates.map(t => `<option value="${t.id}">${t.name}</option>`).join('')}
+            </optgroup>
+            <optgroup label="✍️ Writings & Thesis (${writingTemplates.length})">
+              ${writingTemplates.map(t => `<option value="${t.id}">${t.name}</option>`).join('')}
+            </optgroup>
+            <optgroup label="🚀 Landing Pages (${landingTemplates.length})">
+              ${landingTemplates.map(t => `<option value="${t.id}">${t.name}</option>`).join('')}
+            </optgroup>
+          </select>
+
+          <span id="wbCategoryBadge" style="font-size:11px; font-weight:600; padding:2px 8px; border-radius:4px; background:#242424; color:#a3e635; border:1px solid #333;">
+            💼 Portfolio
+          </span>
+
+          <span id="wbTemplateCount" style="font-size:11px; color:#777; font-family:var(--font-mono);">
+            1 of 12
+          </span>
+        </div>
+
+        <!-- Right: Horizontally Scrollable Category Template Chips -->
+        <div id="wbChipsContainer" style="display:flex; align-items:center; gap:6px; overflow-x:auto; white-space:nowrap; padding:2px 0;">
+          <!-- Dynamically populated via renderChips() -->
+        </div>
+      </div>
+
+      <!-- Main Canvas Viewport Area -->
+      <div style="flex:1; background:#0d0d0d; display:flex; justify-content:center; align-items:center; overflow:hidden; padding:16px;">
+        <div id="wbFrameWrapper" style="width:100%; height:100%; transition:width 0.25s cubic-bezier(0.16, 1, 0.3, 1); border-radius:10px; overflow:hidden; box-shadow:0 12px 48px rgba(0,0,0,0.7); background:#fff;">
+          <iframe id="wbIframe" style="width:100%; height:100%; border:none; display:block;" sandbox="allow-scripts allow-same-origin"></iframe>
+        </div>
+      </div>
+    </div>
+  `;
+
+  const iframe = container.querySelector('#wbIframe');
+  const frameWrapper = container.querySelector('#wbFrameWrapper');
+  const select = container.querySelector('#wbTemplateSelect');
+  const countSpan = container.querySelector('#wbTemplateCount');
+  const catBadge = container.querySelector('#wbCategoryBadge');
+  const chipsContainer = container.querySelector('#wbChipsContainer');
+  const btnPrev = container.querySelector('#wbBtnPrev');
+  const btnNext = container.querySelector('#wbBtnNext');
+  const btnDesktop = container.querySelector('#wbVpDesktop');
+  const btnTablet = container.querySelector('#wbVpTablet');
+  const btnMobile = container.querySelector('#wbVpMobile');
+  const btnOpenRaw = container.querySelector('#wbBtnOpenRaw');
+  const btnUse = container.querySelector('#wbBtnUse');
+  const catBtns = container.querySelectorAll('.wb-cat-btn');
+
+  function renderChips() {
+    const activeList = getActiveCategoryTemplates();
+    chipsContainer.innerHTML = activeList.map(t => {
+      const isSelected = t.id === TEMPLATES[currentTemplateIndex].id;
+      return `
+        <button class="wb-chip" data-id="${t.id}" style="padding:3px 10px; font-size:11px; font-weight:600; border-radius:999px; border:1px solid ${isSelected ? '#666' : '#2a2a2a'}; background:${isSelected ? '#2e2e2e' : '#181818'}; color:${isSelected ? '#ffffff' : '#888'}; cursor:pointer; display:inline-flex; align-items:center; gap:5px; transition:all 0.15s ease; flex-shrink:0;">
+          <span style="width:6px; height:6px; border-radius:50%; background:${t.accentDefault};"></span>
+          <span>${t.name}</span>
+        </button>
+      `;
+    }).join('');
+
+    // Attach click events on chips
+    chipsContainer.querySelectorAll('.wb-chip').forEach(chip => {
+      chip.addEventListener('click', () => {
+        const tid = chip.getAttribute('data-id');
+        const idx = TEMPLATES.findIndex(t => t.id === tid);
+        if (idx !== -1) updateTemplate(idx);
+      });
+    });
+  }
+
+  function updateTemplate(newIndex) {
+    if (newIndex < 0) newIndex = TEMPLATES.length - 1;
+    if (newIndex >= TEMPLATES.length) newIndex = 0;
+    currentTemplateIndex = newIndex;
+    const tmpl = TEMPLATES[currentTemplateIndex];
+
+    // Determine category of this template
+    const tmplCat = getTemplateCategoryKey(tmpl.id);
+    const catMeta = getTemplateCategoryMeta(tmpl.id);
+
+    // If currentCategory is specific and doesn't contain this template, update category tabs
+    if (currentCategory !== 'all' && currentCategory !== tmplCat) {
+      currentCategory = tmplCat;
+      catBtns.forEach(b => {
+        const isBActive = b.getAttribute('data-cat') === currentCategory;
+        b.style.background = isBActive ? '#383838' : 'transparent';
+        b.style.color = isBActive ? '#fff' : '#aaa';
+      });
+    }
+
+    select.value = tmpl.id;
+
+    // Update Category Badge
+    catBadge.innerHTML = `${catMeta.icon} ${catMeta.badge}`;
+    catBadge.style.color = tmplCat === 'blog' ? '#fbbf24' : tmplCat === 'business' ? '#38bdf8' : '#a3e635';
+
+    // Update Counter relative to active category
+    const activeList = getActiveCategoryTemplates();
+    const posInActive = activeList.findIndex(t => t.id === tmpl.id);
+    const posText = posInActive !== -1 ? `${posInActive + 1} of ${activeList.length}` : `${currentTemplateIndex + 1} of ${TEMPLATES.length}`;
+    countSpan.textContent = `${posText} (${currentCategory === 'all' ? 'All' : catMeta.shortLabel})`;
+
+    btnUse.setAttribute('href', `/create?template=${tmpl.id}`);
+
+    // Update address bar cleanly without page reload
+    window.history.replaceState(null, '', `/preview/${tmpl.id}`);
+
+    // Re-render chips to highlight active selection
+    renderChips();
+
+    // Render HTML in iframe
+    const mockData = getSampleTemplateData(tmpl.id);
+    const html = renderSite(mockData, '/').body;
+    iframe.srcdoc = html;
+  }
+
+  function stepCategoryTemplate(direction) {
+    const activeList = getActiveCategoryTemplates();
+    if (!activeList.length) return;
+    const tmpl = TEMPLATES[currentTemplateIndex];
+    let pos = activeList.findIndex(t => t.id === tmpl.id);
+    if (pos === -1) pos = 0;
+
+    let nextPos = pos + direction;
+    if (nextPos < 0) nextPos = activeList.length - 1;
+    if (nextPos >= activeList.length) nextPos = 0;
+
+    const nextTmpl = activeList[nextPos];
+    const targetGlobalIdx = TEMPLATES.findIndex(t => t.id === nextTmpl.id);
+    if (targetGlobalIdx !== -1) updateTemplate(targetGlobalIdx);
+  }
+
+  function setViewport(vp) {
+    currentViewport = vp;
+    [btnDesktop, btnTablet, btnMobile].forEach(b => {
+      b.classList.remove('btn-primary');
+      b.classList.add('btn-outline');
+    });
+
+    if (vp === 'desktop') {
+      btnDesktop.classList.add('btn-primary');
+      btnDesktop.classList.remove('btn-outline');
+      frameWrapper.style.width = '100%';
+    } else if (vp === 'tablet') {
+      btnTablet.classList.add('btn-primary');
+      btnTablet.classList.remove('btn-outline');
+      frameWrapper.style.width = '768px';
+    } else if (vp === 'mobile') {
+      btnMobile.classList.add('btn-primary');
+      btnMobile.classList.remove('btn-outline');
+      frameWrapper.style.width = '375px';
+    }
+  }
+
+  // Category Tab Click Listeners
+  catBtns.forEach(btn => {
+    btn.addEventListener('click', () => {
+      const cat = btn.getAttribute('data-cat');
+      currentCategory = cat;
+      catBtns.forEach(b => {
+        const isBActive = b.getAttribute('data-cat') === currentCategory;
+        b.style.background = isBActive ? '#383838' : 'transparent';
+        b.style.color = isBActive ? '#fff' : '#aaa';
+      });
+
+      const activeList = getActiveCategoryTemplates();
+      // If current template not in newly selected category, jump to first
+      const currentInCat = activeList.find(t => t.id === TEMPLATES[currentTemplateIndex].id);
+      if (!currentInCat && activeList.length > 0) {
+        const newGlobalIdx = TEMPLATES.findIndex(t => t.id === activeList[0].id);
+        updateTemplate(newGlobalIdx);
+      } else {
+        renderChips();
+        const posInActive = activeList.findIndex(t => t.id === TEMPLATES[currentTemplateIndex].id);
+        const catMeta = getTemplateCategoryMeta(TEMPLATES[currentTemplateIndex].id);
+        countSpan.textContent = `${posInActive + 1} of ${activeList.length} (${currentCategory === 'all' ? 'All' : catMeta.shortLabel})`;
+      }
+    });
+  });
+
+  select.addEventListener('change', (e) => {
+    const idx = TEMPLATES.findIndex(t => t.id === e.target.value);
+    if (idx !== -1) updateTemplate(idx);
+  });
+
+  btnPrev.addEventListener('click', () => stepCategoryTemplate(-1));
+  btnNext.addEventListener('click', () => stepCategoryTemplate(1));
+
+  btnDesktop.addEventListener('click', () => setViewport('desktop'));
+  btnTablet.addEventListener('click', () => setViewport('tablet'));
+  btnMobile.addEventListener('click', () => setViewport('mobile'));
+
+  btnOpenRaw.addEventListener('click', () => {
+    const tmpl = TEMPLATES[currentTemplateIndex];
+    const mockData = getSampleTemplateData(tmpl.id);
+    const html = renderSite(mockData, '/').body;
+    const blob = new Blob([html], { type: 'text/html' });
+    const url = URL.createObjectURL(blob);
+    window.open(url, '_blank');
+  });
+
+  // Arrow key navigation listener (Left / Right keys to cycle through templates within category)
+  const keyHandler = (e) => {
+    if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA' || e.target.tagName === 'SELECT') return;
+    if (e.key === 'ArrowLeft') {
+      stepCategoryTemplate(-1);
+    } else if (e.key === 'ArrowRight') {
+      stepCategoryTemplate(1);
+    }
+  };
+  window.addEventListener('keydown', keyHandler);
+
+  // Initial load
+  updateTemplate(currentTemplateIndex);
+  setViewport('desktop');
 }
 
 // ------------------------------------------------------------------------------

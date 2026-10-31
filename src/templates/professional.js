@@ -2,7 +2,7 @@
 // TEMPLATE 4: PROFESSIONAL PROFILE
 // Executive career history, polished introduction, impact metrics, resume download.
 // ==============================================================================
-import { escapeHtml, sanitizeUrl, renderSafeMarkdown } from './sanitizer.js';
+import { escapeHtml, sanitizeUrl, renderSafeMarkdown, sanitizeColor } from './sanitizer.js';
 import { renderHead, renderNav, renderContactForm, renderFooter, renderClientScript, FONT_PAIRS } from './common.js';
 
 export function renderProfessional(siteData, currentPath = '/') {
@@ -17,7 +17,7 @@ export function renderProfessional(siteData, currentPath = '/') {
   const projects = content.projects || [];
   const testimonials = content.testimonials || [];
   const resume = content.resume || {};
-  const primaryColor = site.theme_config?.primaryColor || '#0f766e'; // Teal / Slate
+  const primaryColor = sanitizeColor(site.theme_config?.primaryColor, '#0f766e'); // Teal / Slate
   const fontPair = FONT_PAIRS['playfair-plus'];
 
   return `<!DOCTYPE html>

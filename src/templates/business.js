@@ -2,7 +2,7 @@
 // TEMPLATE 8: SMALL BUSINESS
 // Services, introduction, testimonials, gallery, business info & contact form.
 // ==============================================================================
-import { escapeHtml, sanitizeUrl, renderSafeMarkdown } from './sanitizer.js';
+import { escapeHtml, sanitizeUrl, renderSafeMarkdown, sanitizeColor } from './sanitizer.js';
 import { renderHead, renderNav, renderContactForm, renderFooter, renderClientScript, FONT_PAIRS } from './common.js';
 
 export function renderBusiness(siteData, currentPath = '/') {
@@ -15,7 +15,7 @@ export function renderBusiness(siteData, currentPath = '/') {
   const testimonials = content.testimonials || [];
   const gallery = content.gallery || [];
   const contact = content.contact || {};
-  const primaryColor = site.theme_config?.primaryColor || '#0284c7'; // Professional Sky Blue
+  const primaryColor = sanitizeColor(site.theme_config?.primaryColor, '#0284c7'); // Professional Sky Blue
   const fontPair = FONT_PAIRS['playfair-plus'];
 
   return `<!DOCTYPE html>

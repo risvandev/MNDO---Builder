@@ -2,7 +2,7 @@
 // TEMPLATE 15: VISUAL SHOWCASE & GALLERY (CARGO & VSCO INSPIRED)
 // Designed for visual creators, photographers, UI/UX designers, and visual architects.
 // ==============================================================================
-import { escapeHtml, sanitizeUrl } from './sanitizer.js';
+import { escapeHtml, sanitizeUrl, sanitizeColor } from './sanitizer.js';
 import { renderHead, renderClientScript, FONT_PAIRS } from './common.js';
 
 export function renderVisualGallery(siteData, currentPath = '/') {
@@ -11,7 +11,7 @@ export function renderVisualGallery(siteData, currentPath = '/') {
   const content = site.content || {};
   const hero = content.hero || {};
   const projects = content.projects || [];
-  const primaryColor = site.theme_config?.primaryColor || '#0a0a0a';
+  const primaryColor = sanitizeColor(site.theme_config?.primaryColor, '#0a0a0a');
   const fontPair = FONT_PAIRS['syne-inter'] || FONT_PAIRS['inter-outfit'];
 
   return `<!DOCTYPE html>

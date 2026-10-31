@@ -2,7 +2,7 @@
 // TEMPLATE 6: MODERN PORTFOLIO
 // Tech-forward glassmorphism, subtle accent glow, responsive card grid.
 // ==============================================================================
-import { escapeHtml, sanitizeUrl, renderSafeMarkdown } from './sanitizer.js';
+import { escapeHtml, sanitizeUrl, renderSafeMarkdown, sanitizeColor } from './sanitizer.js';
 import { renderHead, renderNav, renderContactForm, renderFooter, renderClientScript, FONT_PAIRS } from './common.js';
 
 export function renderModern(siteData, currentPath = '/') {
@@ -15,7 +15,7 @@ export function renderModern(siteData, currentPath = '/') {
   const projects = content.projects || [];
   const experience = content.experience || [];
   const education = content.education || [];
-  const primaryColor = site.theme_config?.primaryColor || '#6366f1'; // Indigo
+  const primaryColor = sanitizeColor(site.theme_config?.primaryColor, '#6366f1'); // Indigo
   const fontPair = FONT_PAIRS['inter-outfit'];
 
   return `<!DOCTYPE html>

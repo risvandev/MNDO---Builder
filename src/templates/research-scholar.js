@@ -3,7 +3,7 @@
 // Split layout for researchers, scientists, PhD candidates, and academics.
 // Features publications with badges (PDF, Code, BibTeX, DOI) and sticky scholar card.
 // ==============================================================================
-import { escapeHtml, sanitizeUrl, renderSafeMarkdown } from './sanitizer.js';
+import { escapeHtml, sanitizeUrl, renderSafeMarkdown, sanitizeColor } from './sanitizer.js';
 import { renderHead, renderNav, renderContactForm, renderFooter, renderClientScript, FONT_PAIRS } from './common.js';
 
 export function renderResearchScholar(siteData, currentPath = '/') {
@@ -16,7 +16,7 @@ export function renderResearchScholar(siteData, currentPath = '/') {
   const projects = content.projects || []; // Publications & research projects
   const experience = content.experience || []; // Appointments / Teaching
   const education = content.education || []; // Degrees & Education
-  const primaryColor = site.theme_config?.primaryColor || '#0369a1'; // Scholarly Navy/Blue
+  const primaryColor = sanitizeColor(site.theme_config?.primaryColor, '#0369a1'); // Scholarly Navy/Blue
   const fontPair = FONT_PAIRS['merriweather-roboto'];
 
   return `<!DOCTYPE html>

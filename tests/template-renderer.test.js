@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { renderSite, TEMPLATES } from '../src/templates/index.js';
+import { renderSite, TEMPLATES, getTemplateEditorMode, isBlogMode } from '../src/templates/index.js';
 
 describe('Production Template Engine & Zero-Runtime Validation', () => {
   const baseSiteData = {
@@ -231,6 +231,71 @@ describe('Production Template Engine & Zero-Runtime Validation', () => {
     expect(result.status).toBe(200);
   });
 
+  it('renders dedicated custom page body when page has content (A8)', () => {
+    const siteWithCustomContent = JSON.parse(JSON.stringify(baseSiteData));
+    siteWithCustomContent.pages = [
+      {
+        id: 'page-privacy',
+        path: '/privacy',
+        title: 'Privacy Policy',
+        content: '# Privacy Policy\n\nWe do not track your activity or store cookies.',
+        is_published: true,
+        is_in_nav: true
+      }
+    ];
+
+    const result = renderSite(siteWithCustomContent, '/privacy');
+    expect(result.status).toBe(200);
+    expect(result.body).toContain('<h1>Privacy Policy</h1>');
+    expect(result.body).toContain('We do not track your activity or store cookies');
+    expect(result.body).toContain('custom-page');
+  });
+
+  it('determines editor mode consistently across templates and site types (A1)', () => {
+    // Blog templates
+    expect(getTemplateEditorMode('personal-blog')).toBe('blog');
+    expect(getTemplateEditorMode('minimal-text')).toBe('blog');
+    expect(getTemplateEditorMode('digital-garden')).toBe('blog');
+    expect(getTemplateEditorMode('thesis-story')).toBe('blog');
+
+    // Portfolio templates
+    expect(getTemplateEditorMode('minimal')).toBe('portfolio');
+    expect(getTemplateEditorMode('split-engineer')).toBe('portfolio');
+    expect(getTemplateEditorMode('developer')).toBe('portfolio');
+    expect(getTemplateEditorMode('design-engineer')).toBe('portfolio');
+    expect(getTemplateEditorMode('interactive-resume')).toBe('portfolio');
+
+    // Landing templates
+    expect(getTemplateEditorMode('product-launch')).toBe('landing');
+    expect(getTemplateEditorMode('business')).toBe('landing');
+
+    // isBlogMode helper
+    expect(isBlogMode({ site_type: 'blog', template_id: 'minimal' })).toBe(true);
+    expect(isBlogMode({ site_type: 'portfolio', template_id: 'minimal-text' })).toBe(true);
+    expect(isBlogMode({ site_type: 'portfolio', template_id: 'minimal' })).toBe(false);
+  });
+
+  it('empty portfolio templates do not render fabricated sample projects or jobs (A14)', () => {
+    const emptyPortfolioSite = JSON.parse(JSON.stringify(baseSiteData));
+    emptyPortfolioSite.site.content.projects = [];
+    emptyPortfolioSite.site.content.experience = [];
+
+    const templatesToCheck = ['minimal', 'split-engineer', 'interactive-resume', 'developer', 'design-engineer'];
+
+    for (const tmplId of templatesToCheck) {
+      emptyPortfolioSite.site.template_id = tmplId;
+      const res = renderSite(emptyPortfolioSite, '/');
+      expect(res.status).toBe(200);
+
+      // Verify fabricated sample companies and projects are NOT in the output
+      expect(res.body).not.toContain('TechEdge Labs');
+      expect(res.body).not.toContain('Edge Compute &amp; Cache Mesh');
+      expect(res.body).not.toContain('Edge Compute & Cache Mesh');
+      expect(res.body).not.toContain('Synthetix Systems');
+      expect(res.body).not.toContain('Lead Design Systems');
+    }
+  });
+
   it('returns high quality 404 response for non-existent page paths', () => {
     const result = renderSite(baseSiteData, '/non-existent-secret-page');
     expect(result.status).toBe(404);
@@ -238,3 +303,4 @@ describe('Production Template Engine & Zero-Runtime Validation', () => {
     expect(result.body).toContain('Page Not Found');
   });
 });
+

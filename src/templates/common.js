@@ -1,7 +1,7 @@
 // ==============================================================================
 // MNDO BUILDER - SHARED TEMPLATE HELPERS & COMMON COMPONENTS
 // ==============================================================================
-import { escapeHtml, sanitizeUrl } from './sanitizer.js';
+import { escapeHtml, sanitizeUrl, sanitizeColor } from './sanitizer.js';
 import { getBaseUrl } from './seo-generators.js';
 
 export const FONT_PAIRS = {
@@ -45,7 +45,8 @@ export function renderHead(site, pageTitle = null, pageDescription = null, curre
   const canonicalUrl = `${baseUrl}${currentPath === '/' ? '' : currentPath}`;
   const title = pageTitle ? `${escapeHtml(pageTitle)} | ${escapeHtml(site.title)}` : escapeHtml(site.title || 'Personal Website');
   const description = escapeHtml(pageDescription || site.seo_config?.metaDescription || site.description || site.content?.hero?.tagline || '');
-  const primaryColor = site.theme_config?.primaryColor || '#2563eb';
+  const primaryColor = sanitizeColor(site.theme_config?.primaryColor, '#2563eb');
+
   const fontPairKey = site.theme_config?.fontPair || 'inter-outfit';
   const fontInfo = FONT_PAIRS[fontPairKey] || FONT_PAIRS['inter-outfit'];
   const discourage = Boolean(site.seo_config?.discourageSearch);

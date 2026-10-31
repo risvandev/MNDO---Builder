@@ -2,7 +2,7 @@
 // TEMPLATE 14: PRODUCT & SAAS LAUNCHPAD (CARRD & INDIE HACKERS INSPIRED)
 // High-converting single-page landing for micro-SaaS, digital products, and tools.
 // ==============================================================================
-import { escapeHtml, sanitizeUrl } from './sanitizer.js';
+import { escapeHtml, sanitizeUrl, sanitizeColor } from './sanitizer.js';
 import { renderHead, renderContactForm, renderClientScript, FONT_PAIRS } from './common.js';
 
 export function renderProductLaunch(siteData, currentPath = '/') {
@@ -12,7 +12,7 @@ export function renderProductLaunch(siteData, currentPath = '/') {
   const hero = content.hero || {};
   const projects = content.projects || [];
   const skills = content.skills || [];
-  const primaryColor = site.theme_config?.primaryColor || '#6366f1';
+  const primaryColor = sanitizeColor(site.theme_config?.primaryColor, '#6366f1');
   const fontPair = FONT_PAIRS['inter-outfit'];
 
   return `<!DOCTYPE html>

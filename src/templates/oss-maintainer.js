@@ -3,7 +3,7 @@
 // Crafted for open source developers, library authors, CLI creators, and toolmakers.
 // Repository cards with stars/forks, install command banner, and sponsorship CTA.
 // ==============================================================================
-import { escapeHtml, sanitizeUrl } from './sanitizer.js';
+import { escapeHtml, sanitizeUrl, sanitizeColor } from './sanitizer.js';
 import { renderHead, renderClientScript, FONT_PAIRS } from './common.js';
 
 export function renderOssMaintainer(siteData, currentPath = '/') {
@@ -13,7 +13,7 @@ export function renderOssMaintainer(siteData, currentPath = '/') {
   const about = content.about || {};
   const projects = content.projects || [];
   const skills = content.skills || [];
-  const primaryColor = site.theme_config?.primaryColor || '#8b5cf6'; // Violet open-source
+  const primaryColor = sanitizeColor(site.theme_config?.primaryColor, '#8b5cf6'); // Violet open-source
   const fontPair = FONT_PAIRS['jetbrains-inter'] || FONT_PAIRS['inter-outfit'];
 
   return `<!DOCTYPE html>
@@ -184,11 +184,12 @@ export function renderOssMaintainer(siteData, currentPath = '/') {
       </div>
     </header>
 
+    ${projects.length > 0 ? `
     <!-- Open Source Repositories -->
     <section class="section-wrap" id="repos">
       <div class="section-title">Pinned Packages &amp; Repositories</div>
       <div class="repo-grid">
-        ${projects.length > 0 ? projects.map(proj => `
+        ${projects.map(proj => `
           <div class="repo-card">
             <div>
               <div class="repo-header">
@@ -200,61 +201,26 @@ export function renderOssMaintainer(siteData, currentPath = '/') {
               <p class="repo-desc">${escapeHtml(proj.description || '')}</p>
             </div>
             <div class="repo-meta">
-              <span class="repo-lang"><span class="repo-lang-dot"></span> TypeScript</span>
-              <span>⭐ 3.8k</span>
-              <span>MIT</span>
+              <span class="repo-lang"><span class="repo-lang-dot"></span> Open Source</span>
+              ${proj.tags && proj.tags.length ? `<span>${escapeHtml(proj.tags[0])}</span>` : ''}
             </div>
           </div>
-        `).join('') : `
-          <div class="repo-card">
-            <div>
-              <div class="repo-header">
-                <a href="#" class="repo-name">edge-router-core</a>
-                <span style="font-size:11px; font-family:var(--font-mono); color:var(--muted);">Public</span>
-              </div>
-              <p class="repo-desc">High-velocity edge subdomain routing and URL rewriter for Cloudflare Workers with zero client latency.</p>
-            </div>
-            <div class="repo-meta">
-              <span class="repo-lang"><span class="repo-lang-dot"></span> TypeScript</span>
-              <span>⭐ 5.4k</span>
-              <span>MIT</span>
-            </div>
-          </div>
-          <div class="repo-card">
-            <div>
-              <div class="repo-header">
-                <a href="#" class="repo-name">pure-html-renderer</a>
-                <span style="font-size:11px; font-family:var(--font-mono); color:var(--muted);">Public</span>
-              </div>
-              <p class="repo-desc">Zero-runtime static page generator producing clean semantic markup without React or hydration overhead.</p>
-            </div>
-            <div class="repo-meta">
-              <span class="repo-lang"><span class="repo-lang-dot" style="background:#f7df1e;"></span> JavaScript</span>
-              <span>⭐ 2.9k</span>
-              <span>MIT</span>
-            </div>
-          </div>
-        `}
+        `).join('')}
       </div>
     </section>
+    ` : ''}
 
+    ${skills.length > 0 ? `
     <!-- Open Source Ecosystem -->
     <section class="section-wrap">
       <div class="section-title">Ecosystem &amp; Tech Stack</div>
       <div class="tool-cloud">
-        ${skills.length > 0 ? skills.map(s => `
+        ${skills.map(s => `
           <span class="tool-pill">${escapeHtml(s.name || s)}</span>
-        `).join('') : `
-          <span class="tool-pill">TypeScript</span>
-          <span class="tool-pill">Node.js</span>
-          <span class="tool-pill">Cloudflare Workers</span>
-          <span class="tool-pill">WebAssembly</span>
-          <span class="tool-pill">Git / GitHub Actions</span>
-          <span class="tool-pill">Rollup / Vite</span>
-          <span class="tool-pill">Linux Kernel / Bash</span>
-        `}
+        `).join('')}
       </div>
     </section>
+    ` : ''}
 
     <footer class="oss-footer">
       <div>&copy; ${new Date().getFullYear()} ${escapeHtml(site.title)} &bull; Free &amp; Open Source.</div>

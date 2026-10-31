@@ -11,8 +11,8 @@ import {
   saveSitePages,
   deleteSite
 } from './supabase.js';
-import { renderSite, TEMPLATES } from '../templates/index.js';
-import { checkSubdomainAvailability } from './validation.js';
+import { renderSite, TEMPLATES, isBlogMode, getTemplateEditorMode } from '../templates/index.js';
+import { checkSubdomainAvailability, normalizeSlug, validatePagePath, validatePrimaryColor } from './validation.js';
 import { publishSite, unpublishSite } from './publishing.js';
 import { uploadAsset } from './uploads.js';
 import { showToast } from './components/toast.js';
@@ -24,8 +24,52 @@ let activeTab = 'content'; // 'content' | 'pages' | 'design'
 let activeDevice = 'desktop'; // 'desktop' | 'tablet' | 'mobile'
 let previewPath = '/';
 let debounceTimer = null;
+let saveStatus = 'saved'; // 'saved' | 'saving' | 'failed'
+
+function resetEditorState() {
+  if (debounceTimer) {
+    clearTimeout(debounceTimer);
+    debounceTimer = null;
+  }
+  activeSiteData = null;
+  activeTab = 'content';
+  activeDevice = 'desktop';
+  previewPath = '/';
+  saveStatus = 'saved';
+}
+
+function getTabsHtml(site) {
+  const isBlog = isBlogMode(site);
+  if (isBlog && activeTab === 'pages') {
+    activeTab = 'content';
+  }
+  return isBlog ? `
+    <div class="editor-tabs">
+      <button class="editor-tab-item ${activeTab === 'content' ? 'active' : ''}" data-tab="content">Content</button>
+      <button class="editor-tab-item ${activeTab === 'design' ? 'active' : ''}" data-tab="design">Design</button>
+    </div>
+  ` : `
+    <div class="editor-tabs">
+      <button class="editor-tab-item ${activeTab === 'content' ? 'active' : ''}" data-tab="content">Content</button>
+      <button class="editor-tab-item ${activeTab === 'pages' ? 'active' : ''}" data-tab="pages">Pages</button>
+      <button class="editor-tab-item ${activeTab === 'design' ? 'active' : ''}" data-tab="design">Design</button>
+    </div>
+  `;
+}
+
+export function refreshEditorTabs(container) {
+  const root = container || document;
+  const wrap = root.querySelector('#editorTabsWrap');
+  if (wrap && activeSiteData?.site) {
+    wrap.innerHTML = getTabsHtml(activeSiteData.site);
+    setupTabListeners(root);
+    renderActiveTabContent(root);
+  }
+}
 
 export async function renderEditor(container, siteId) {
+  resetEditorState();
+
   container.innerHTML = `
     <div style="display:flex; align-items:center; justify-content:center; height:calc(100vh - 68px); color:var(--text-muted);">
       Loading Studio Editor...
@@ -46,26 +90,7 @@ export async function renderEditor(container, siteId) {
   }
 
   const site = activeSiteData.site;
-  const isBlog = site.site_type === 'blog' || ['personal-blog', 'thesis-story', 'minimal-text', 'digital-garden'].includes(site.template_id);
-
-  // Ensure activeTab is valid for site type
-  if (isBlog && activeTab === 'pages') {
-    activeTab = 'content';
-  }
-
-  // Dynamic tabs: Blog has Content & Design only; Portfolio/Landing has Content, Pages, and Design
-  const tabsHtml = isBlog ? `
-    <div class="editor-tabs">
-      <button class="editor-tab-item ${activeTab === 'content' ? 'active' : ''}" data-tab="content">Content</button>
-      <button class="editor-tab-item ${activeTab === 'design' ? 'active' : ''}" data-tab="design">Design</button>
-    </div>
-  ` : `
-    <div class="editor-tabs">
-      <button class="editor-tab-item ${activeTab === 'content' ? 'active' : ''}" data-tab="content">Content</button>
-      <button class="editor-tab-item ${activeTab === 'pages' ? 'active' : ''}" data-tab="pages">Pages</button>
-      <button class="editor-tab-item ${activeTab === 'design' ? 'active' : ''}" data-tab="design">Design</button>
-    </div>
-  `;
+  const tabsHtml = getTabsHtml(site);
 
   container.innerHTML = `
     <div class="studio-container">
@@ -82,6 +107,10 @@ export async function renderEditor(container, siteId) {
             </div>
           </div>
           <div style="display:flex; align-items:center; gap:8px;">
+            <!-- Autosave Status Indicator (A6) -->
+            <div id="editorSaveStatus" style="font-size:11.5px; font-weight:500; color:var(--text-muted); padding:3px 8px; border-radius:12px; background:var(--paper-soft); border:1px solid var(--line-subtle); display:flex; align-items:center; gap:5px;">
+              <span style="color:#10b981;">✓</span> <span>Saved</span>
+            </div>
             <button class="icon-btn" id="btnOpenSettings" title="Site Settings & SEO">
               <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                 <circle cx="12" cy="12" r="3"></circle>
@@ -95,7 +124,7 @@ export async function renderEditor(container, siteId) {
         </div>
 
         <!-- Navigation Tabs -->
-        <div style="padding:14px 24px 0;">
+        <div id="editorTabsWrap" style="padding:14px 24px 0;">
           ${tabsHtml}
         </div>
 
@@ -140,6 +169,7 @@ export async function renderEditor(container, siteId) {
   renderActiveTabContent(container);
   updateLivePreview();
 }
+
 
 // ------------------------------------------------------------------------------
 // TAB SWITCHING & LISTENER SETUP
@@ -222,8 +252,9 @@ function renderActiveTabContent(container) {
   const panel = container.querySelector('#editorTabContent');
   if (!panel) return;
 
-  const site = activeSiteData.site;
-  const isBlog = site.site_type === 'blog' || site.template_id === 'personal-blog' || site.template_id === 'thesis-story';
+  const site = activeSiteData?.site;
+  if (!site) return;
+  const isBlog = isBlogMode(site);
 
   if (activeTab === 'content') {
     if (isBlog) {
@@ -388,16 +419,36 @@ function renderBlogContentTab(panel) {
     });
   });
 
-  // Delete writing triggers
+  // Delete writing triggers (A11: with confirmation and await/rollback)
   panel.querySelectorAll('.btn-delete-post').forEach(btn => {
     btn.addEventListener('click', () => {
       const idx = parseInt(btn.getAttribute('data-idx'), 10);
-      activeSiteData.posts.splice(idx, 1);
-      saveSitePosts(activeSiteData.site.id, activeSiteData.posts);
-      renderBlogContentTab(panel);
-      previewPath = '/';
-      updateLivePreview();
-      showToast('Writing removed.', 'info');
+      const postToDelete = activeSiteData.posts[idx];
+      if (!postToDelete) return;
+
+      openModal({
+        title: 'Delete Story?',
+        contentHtml: `<p>Are you sure you want to permanently delete <strong>${escapeHtml(postToDelete.title)}</strong>? This action cannot be undone.</p>`,
+        confirmText: 'Delete Story',
+        isDanger: true,
+        onConfirm: async () => {
+          const previousPosts = [...activeSiteData.posts];
+          try {
+            activeSiteData.posts.splice(idx, 1);
+            await saveSitePosts(activeSiteData.site.id, activeSiteData.posts);
+            renderBlogContentTab(panel);
+            if (previewPath.startsWith(`/blog/${postToDelete.slug}`)) {
+              previewPath = '/';
+            }
+            updateLivePreview();
+            showToast('Writing deleted successfully.', 'info');
+          } catch (err) {
+            activeSiteData.posts = previousPosts;
+            renderBlogContentTab(panel);
+            showToast('Failed to delete writing: ' + err.message, 'error');
+          }
+        }
+      });
     });
   });
 
@@ -413,12 +464,12 @@ function renderBlogContentTab(panel) {
 function openPostEditor(postIdx, parentPanel) {
   const isNew = postIdx === null;
   const post = !isNew ? activeSiteData.posts[postIdx] : {
-    title: 'New Story / Thesis Chapter',
+    title: 'New Story / Article',
     slug: 'new-story',
-    excerpt: 'A brief summary of this writing piece.',
+    excerpt: '',
     body_markdown: '# Title\n\nStart writing your story, thesis chapter, essay, or thoughts here...',
     tags: ['writing'],
-    status: 'published'
+    status: 'draft' // A9: Default all newly created posts to draft!
   };
 
   openModal({
@@ -457,8 +508,8 @@ function openPostEditor(postIdx, parentPanel) {
         <div class="form-group">
           <label class="form-label">Status</label>
           <select class="form-select" id="postModalStatus">
-            <option value="published" ${post.status === 'published' ? 'selected' : ''}>Published (Live URL)</option>
             <option value="draft" ${post.status === 'draft' ? 'selected' : ''}>Draft (Private)</option>
+            <option value="published" ${post.status === 'published' ? 'selected' : ''}>Published (Live URL)</option>
           </select>
         </div>
       </div>
@@ -466,7 +517,8 @@ function openPostEditor(postIdx, parentPanel) {
     confirmText: isNew ? 'Save & Preview' : 'Update Story',
     onConfirm: async () => {
       const title = document.getElementById('postModalTitle').value.trim() || 'Untitled Story';
-      const slug = document.getElementById('postModalSlug').value.trim().toLowerCase().replace(/[^a-z0-9-]/g, '-') || 'story';
+      const rawSlug = document.getElementById('postModalSlug').value.trim();
+      const slug = normalizeSlug(rawSlug || title, activeSiteData.posts, post.id);
       const excerpt = document.getElementById('postModalExcerpt').value.trim();
       const body = document.getElementById('postModalBody').value;
       const tags = document.getElementById('postModalTags').value.split(',').map(t => t.trim()).filter(Boolean);
@@ -491,15 +543,19 @@ function openPostEditor(postIdx, parentPanel) {
         activeSiteData.posts[postIdx] = updatedPost;
       }
 
-      await saveSitePosts(activeSiteData.site.id, activeSiteData.posts);
-      renderBlogContentTab(parentPanel);
-      previewPath = `/blog/${slug}`;
-      updateLivePreview();
-      showToast('Story saved and preview loaded.', 'success');
+      try {
+        await saveSitePosts(activeSiteData.site.id, activeSiteData.posts);
+        renderBlogContentTab(parentPanel);
+        previewPath = `/blog/${slug}`;
+        updateLivePreview();
+        showToast('Story saved and preview loaded.', 'success');
+      } catch (err) {
+        showToast('Failed to save story: ' + err.message, 'error');
+      }
     }
   });
 
-  // Auto-slug generator on title input
+  // Auto-slug generator on title input (A10)
   setTimeout(() => {
     const titleInp = document.getElementById('postModalTitle');
     const slugInp = document.getElementById('postModalSlug');
@@ -507,7 +563,7 @@ function openPostEditor(postIdx, parentPanel) {
     if (titleInp && slugInp) {
       if (isNew) {
         titleInp.addEventListener('input', () => {
-          const s = titleInp.value.toLowerCase().replace(/[^a-z0-9-]/g, '-').replace(/-+/g, '-').slice(0, 32);
+          const s = normalizeSlug(titleInp.value, activeSiteData.posts, post.id);
           slugInp.value = s;
           if (mirror) mirror.textContent = s;
         });
@@ -956,12 +1012,18 @@ function renderPagesTab(panel) {
       ${pages.map((p, idx) => `
         <div class="card" style="margin-bottom:12px; padding:16px; background:#ffffff; border:1px solid var(--line); border-radius:12px;">
           <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
-            <span style="font-weight:700; font-size:14px; color:var(--ink);">${escapeHtml(p.title)}</span>
+            <div>
+              <span style="font-weight:700; font-size:14px; color:var(--ink);">${escapeHtml(p.title)}</span>
+              ${p.is_in_nav ? '<span style="margin-left:6px; font-size:10.5px; padding:1px 6px; border-radius:4px; background:var(--paper-soft); color:var(--text-dim); border:1px solid var(--line-subtle);">In Nav</span>' : ''}
+            </div>
             <button class="icon-btn btn-delete-page" data-idx="${idx}" title="Delete page">&times;</button>
           </div>
           <div style="display:flex; justify-content:space-between; align-items:center; font-size:12px;">
             <span style="font-family:var(--font-mono); color:var(--ink); font-weight:600;">${escapeHtml(p.path)}</span>
-            <button class="btn btn-outline btn-sm btn-preview-page" data-path="${escapeHtml(p.path)}" style="padding:3px 10px; font-size:11px;">Preview</button>
+            <div style="display:flex; gap:6px;">
+              <button class="btn btn-outline btn-sm btn-edit-page" data-idx="${idx}" style="padding:3px 10px; font-size:11px;">Edit</button>
+              <button class="btn btn-outline btn-sm btn-preview-page" data-path="${escapeHtml(p.path)}" style="padding:3px 10px; font-size:11px;">Preview</button>
+            </div>
           </div>
         </div>
       `).join('')}
@@ -971,56 +1033,150 @@ function renderPagesTab(panel) {
   `;
 
   // Add Page handler
-  panel.querySelector('#btnAddPage').addEventListener('click', () => {
-    openModal({
-      title: 'Create New Page',
-      contentHtml: `
-        <div class="form-group">
-          <label class="form-label">Page Type</label>
-          <select class="form-select" id="modalPageType">
-            <option value="about">About Me (/about)</option>
-            <option value="projects">Projects Showcase (/projects)</option>
-            <option value="services">Services (/services)</option>
-            <option value="contact">Contact (/contact)</option>
-            <option value="custom">Custom Page</option>
-          </select>
-        </div>
-        <div class="form-group">
-          <label class="form-label">Page Title</label>
-          <input type="text" class="form-input" id="modalPageTitle" value="About Me">
-        </div>
-        <div class="form-group">
-          <label class="form-label">URL Path</label>
-          <input type="text" class="form-input" id="modalPagePath" value="/about" placeholder="/about">
-        </div>
-      `,
-      confirmText: 'Create Page',
-      onConfirm: async () => {
-        const type = document.getElementById('modalPageType').value;
-        const title = document.getElementById('modalPageTitle').value.trim();
-        let path = document.getElementById('modalPagePath').value.trim();
-        if (!path.startsWith('/')) path = '/' + path;
+  panel.querySelector('#btnAddPage')?.addEventListener('click', () => {
+    openPageEditor(null, panel);
+  });
 
-        activeSiteData.pages = activeSiteData.pages || [];
-        activeSiteData.pages.push({
-          id: `page-${Date.now()}`,
-          site_id: activeSiteData.site.id,
-          page_type: type,
-          title: title,
-          path: path,
-          is_in_nav: true,
-          is_published: true
-        });
-
-        await saveSitePages(activeSiteData.site.id, activeSiteData.pages);
-        renderPagesTab(panel);
-        previewPath = path;
-        updateLivePreview();
-        showToast(`Created page ${path}`, 'success');
-      }
+  // Edit Page handlers
+  panel.querySelectorAll('.btn-edit-page').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const idx = parseInt(btn.getAttribute('data-idx'), 10);
+      openPageEditor(idx, panel);
     });
+  });
 
-    // Auto-fill path based on type
+  // Delete page handler (A12: Confirmation + Await + Rollback)
+  panel.querySelectorAll('.btn-delete-page').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const idx = parseInt(btn.getAttribute('data-idx'), 10);
+      const pageToDelete = activeSiteData.pages[idx];
+      if (!pageToDelete) return;
+
+      openModal({
+        title: 'Delete Page?',
+        contentHtml: `<p>Are you sure you want to permanently delete <strong>${escapeHtml(pageToDelete.title)}</strong> (<code>${escapeHtml(pageToDelete.path)}</code>)? This action cannot be undone.</p>`,
+        confirmText: 'Delete Page',
+        isDanger: true,
+        onConfirm: async () => {
+          const previousPages = [...activeSiteData.pages];
+          try {
+            activeSiteData.pages.splice(idx, 1);
+            await saveSitePages(activeSiteData.site.id, activeSiteData.pages);
+            renderPagesTab(panel);
+            if (previewPath === pageToDelete.path) {
+              previewPath = '/';
+            }
+            updateLivePreview();
+            showToast('Page deleted successfully.', 'info');
+          } catch (err) {
+            activeSiteData.pages = previousPages;
+            renderPagesTab(panel);
+            showToast('Failed to delete page: ' + err.message, 'error');
+          }
+        }
+      });
+    });
+  });
+
+  // Preview page handler
+  panel.querySelectorAll('.btn-preview-page').forEach(btn => {
+    btn.addEventListener('click', () => {
+      previewPath = btn.getAttribute('data-path');
+      updateLivePreview();
+    });
+  });
+}
+
+function openPageEditor(pageIdx, parentPanel) {
+  const isNew = pageIdx === null;
+  const page = !isNew ? activeSiteData.pages[pageIdx] : {
+    title: 'About Me',
+    path: '/about',
+    page_type: 'about',
+    content: '## About Me\n\nWrite your page story, background, or information here...',
+    is_in_nav: true,
+    is_published: true
+  };
+
+  openModal({
+    title: isNew ? 'Create New Page' : 'Edit Page',
+    contentHtml: `
+      <div class="form-group">
+        <label class="form-label">Page Type</label>
+        <select class="form-select" id="modalPageType">
+          <option value="about" ${page.page_type === 'about' ? 'selected' : ''}>About Me (/about)</option>
+          <option value="projects" ${page.page_type === 'projects' ? 'selected' : ''}>Projects Showcase (/projects)</option>
+          <option value="services" ${page.page_type === 'services' ? 'selected' : ''}>Services (/services)</option>
+          <option value="contact" ${page.page_type === 'contact' ? 'selected' : ''}>Contact (/contact)</option>
+          <option value="custom" ${page.page_type === 'custom' ? 'selected' : ''}>Custom Page</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Page Title</label>
+        <input type="text" class="form-input" id="modalPageTitle" value="${escapeHtml(page.title)}">
+      </div>
+      <div class="form-group">
+        <label class="form-label">URL Path</label>
+        <input type="text" class="form-input" id="modalPagePath" value="${escapeHtml(page.path)}" placeholder="/about">
+        <div class="form-hint">Must start with / and be lowercase (e.g. /about, /projects, /services)</div>
+      </div>
+      <div class="form-group" style="display:flex; align-items:center; gap:8px; margin: 12px 0;">
+        <input type="checkbox" id="modalPageInNav" ${page.is_in_nav ? 'checked' : ''} style="cursor:pointer; width:16px; height:16px;">
+        <label for="modalPageInNav" style="font-size:13px; cursor:pointer;">Show in site navigation bar</label>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Page Content (Markdown Supported)</label>
+        <textarea class="form-textarea" rows="8" id="modalPageContent" style="font-family:var(--font-mono); font-size:13px; line-height:1.6;" placeholder="Write your page markdown content here...">${escapeHtml(page.content || page.body_markdown || '')}</textarea>
+        <div class="form-hint">Supports **bold**, *italic*, headers (##), blockquotes (>), code blocks, and bullet points.</div>
+      </div>
+    `,
+    confirmText: isNew ? 'Create Page' : 'Save Page',
+    onConfirm: async () => {
+      const type = document.getElementById('modalPageType').value;
+      const title = document.getElementById('modalPageTitle').value.trim() || 'Untitled Page';
+      const rawPath = document.getElementById('modalPagePath').value.trim();
+      const inNav = document.getElementById('modalPageInNav').checked;
+      const content = document.getElementById('modalPageContent').value;
+
+      const pathValidation = validatePagePath(rawPath, activeSiteData.pages, page.id);
+      if (!pathValidation.valid) {
+        showToast(pathValidation.error, 'error');
+        throw new Error(pathValidation.error); // Keep modal open
+      }
+
+      activeSiteData.pages = activeSiteData.pages || [];
+      const updatedPage = {
+        id: page.id || `page-${Date.now()}`,
+        site_id: activeSiteData.site.id,
+        page_type: type,
+        title: title,
+        path: pathValidation.path,
+        content: content,
+        body_markdown: content,
+        is_in_nav: inNav,
+        is_published: true
+      };
+
+      if (isNew) {
+        activeSiteData.pages.push(updatedPage);
+      } else {
+        activeSiteData.pages[pageIdx] = updatedPage;
+      }
+
+      try {
+        await saveSitePages(activeSiteData.site.id, activeSiteData.pages);
+        renderPagesTab(parentPanel);
+        previewPath = pathValidation.path;
+        updateLivePreview();
+        showToast(isNew ? `Created page ${pathValidation.path}` : `Saved page ${pathValidation.path}`, 'success');
+      } catch (err) {
+        showToast('Failed to save page: ' + err.message, 'error');
+      }
+    }
+  });
+
+  // Auto-fill path based on type if new
+  if (isNew) {
     setTimeout(() => {
       const typeSelect = document.getElementById('modalPageType');
       const titleInput = document.getElementById('modalPageTitle');
@@ -1036,28 +1192,7 @@ function renderPagesTab(panel) {
         });
       }
     }, 50);
-  });
-
-  // Delete page handler
-  panel.querySelectorAll('.btn-delete-page').forEach(btn => {
-    btn.addEventListener('click', () => {
-      const idx = parseInt(btn.getAttribute('data-idx'), 10);
-      activeSiteData.pages.splice(idx, 1);
-      saveSitePages(activeSiteData.site.id, activeSiteData.pages);
-      renderPagesTab(panel);
-      previewPath = '/';
-      updateLivePreview();
-      showToast('Page removed.', 'info');
-    });
-  });
-
-  // Preview page handler
-  panel.querySelectorAll('.btn-preview-page').forEach(btn => {
-    btn.addEventListener('click', () => {
-      previewPath = btn.getAttribute('data-path');
-      updateLivePreview();
-    });
-  });
+  }
 }
 
 // ------------------------------------------------------------------------------
@@ -1120,18 +1255,31 @@ function renderDesignTab(panel) {
     </div>
   `;
 
-  // Template change
+  // Template change (A2: Refresh editor mode and tabs on template switch)
   panel.querySelector('#templatePicker').addEventListener('change', (e) => {
+    const oldMode = isBlogMode(site);
     site.template_id = e.target.value;
+    const newMode = isBlogMode(site);
+
+    if (newMode !== oldMode) {
+      if (newMode && activeTab === 'pages') {
+        activeTab = 'content';
+      }
+      refreshEditorTabs(document.querySelector('.studio-container') || panel.closest('.studio-container'));
+    }
     scheduleDraftSave();
     updateLivePreview();
   });
 
-  // Color inputs
+  // Color inputs (A13: Strict validation)
   const colorPicker = panel.querySelector('#primaryColorPicker');
   const colorText = panel.querySelector('#primaryColorText');
 
   const updateColor = (hex) => {
+    if (!validatePrimaryColor(hex)) {
+      showToast('Please enter a valid hex color code (e.g. #2563eb).', 'error');
+      return;
+    }
     site.theme_config = site.theme_config || {};
     site.theme_config.primaryColor = hex;
     colorPicker.value = hex;
@@ -1273,6 +1421,7 @@ function openPublishModal(container) {
       publishBtn.disabled = true;
       publishBtn.textContent = 'Publishing...';
       try {
+        await flushPendingSave();
         const res = await publishSite(site.id, slugInput.value.trim().toLowerCase());
         site.status = 'published';
         site.subdomain_slug = res.subdomain;
@@ -1488,23 +1637,70 @@ function updateLivePreview() {
   };
 }
 
-function scheduleDraftSave() {
+function updateSaveStatusUI(status, errorMsg = '') {
+  saveStatus = status;
+  const el = document.getElementById('editorSaveStatus');
+  if (!el) return;
+
+  if (status === 'saving') {
+    el.innerHTML = `<span style="display:inline-block; animation:spin 1s linear infinite;">⏳</span> <span>Saving...</span>`;
+    el.style.color = 'var(--text-muted)';
+  } else if (status === 'saved') {
+    el.innerHTML = `<span style="color:#10b981;">✓</span> <span>Saved</span>`;
+    el.style.color = 'var(--text-muted)';
+  } else if (status === 'failed') {
+    el.innerHTML = `<span style="color:#ef4444;">⚠️</span> <span style="color:#ef4444;">Save Failed</span> <button id="btnRetrySave" style="margin-left:4px; padding:1px 6px; font-size:11px; cursor:pointer; background:#fff; border:1px solid #ef4444; border-radius:4px; color:#ef4444;">Retry</button>`;
+    el.querySelector('#btnRetrySave')?.addEventListener('click', () => {
+      scheduleDraftSave(true);
+    });
+  }
+}
+
+export function scheduleDraftSave(immediate = false) {
   clearTimeout(debounceTimer);
-  debounceTimer = setTimeout(async () => {
+  updateSaveStatusUI('saving');
+
+  const doSave = async () => {
+    if (!activeSiteData?.site) return;
+    const targetSiteId = activeSiteData.site.id;
+    const draftPayload = {
+      title: activeSiteData.site.title,
+      description: activeSiteData.site.description,
+      site_type: activeSiteData.site.site_type,
+      template_id: activeSiteData.site.template_id,
+      theme_config: activeSiteData.site.theme_config,
+      seo_config: activeSiteData.site.seo_config,
+      content: activeSiteData.site.content
+    };
+
     try {
-      await saveSiteDraft(activeSiteData.site.id, {
-        title: activeSiteData.site.title,
-        description: activeSiteData.site.description,
-        template_id: activeSiteData.site.template_id,
-        theme_config: activeSiteData.site.theme_config,
-        seo_config: activeSiteData.site.seo_config,
-        content: activeSiteData.site.content
-      });
-      updateLivePreview();
+      await saveSiteDraft(targetSiteId, draftPayload);
+      if (activeSiteData?.site?.id === targetSiteId) {
+        updateSaveStatusUI('saved');
+        updateLivePreview();
+      }
     } catch (err) {
       console.warn('Failed auto-saving draft:', err);
+      if (activeSiteData?.site?.id === targetSiteId) {
+        updateSaveStatusUI('failed', err.message);
+        showToast('Autosave failed: ' + err.message, 'error');
+      }
     }
-  }, 400);
+  };
+
+  if (immediate) {
+    return doSave();
+  } else {
+    debounceTimer = setTimeout(doSave, 400);
+  }
+}
+
+export async function flushPendingSave() {
+  if (debounceTimer) {
+    clearTimeout(debounceTimer);
+    debounceTimer = null;
+    await scheduleDraftSave(true);
+  }
 }
 
 function escapeHtml(str) {

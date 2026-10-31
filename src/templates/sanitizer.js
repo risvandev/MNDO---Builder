@@ -107,3 +107,26 @@ export function renderSafeMarkdown(markdown) {
 
   return html;
 }
+
+/**
+ * Strict color validation to prevent CSS injection.
+ * Only allows 3, 4, 6, or 8-digit hex colors or safe rgb/rgba/hsl/hsla format.
+ * Disallows any semicolon, quotes, angle brackets, or curly braces.
+ * @param {string} color
+ * @param {string} fallback
+ * @returns {string}
+ */
+export function sanitizeColor(color, fallback = '#111827') {
+  if (!color || typeof color !== 'string') return fallback;
+  const trimmed = color.trim();
+  const hexRegex = /^#([0-9a-fA-F]{3}|[0-9a-fA-F]{4}|[0-9a-fA-F]{6}|[0-9a-fA-F]{8})$/;
+  if (hexRegex.test(trimmed)) {
+    return trimmed;
+  }
+  const funcRegex = /^(rgb|hsl)a?\(\s*[\d.%\s,+-]+\s*\)$/i;
+  if (funcRegex.test(trimmed) && !/[;{}"'<>\\]/.test(trimmed)) {
+    return trimmed;
+  }
+  return fallback;
+}
+

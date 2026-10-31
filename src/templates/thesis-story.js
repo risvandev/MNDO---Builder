@@ -2,7 +2,7 @@
 // TEMPLATE 9: THESIS & LONG-FORM STORY (HUGO BLOX NOTES / ASTRO PAPER INSPIRED)
 // Designed for long-form thesis research, serialized stories, essays, and deep reading.
 // ==============================================================================
-import { escapeHtml, sanitizeUrl, renderSafeMarkdown } from './sanitizer.js';
+import { escapeHtml, sanitizeUrl, renderSafeMarkdown, sanitizeColor } from './sanitizer.js';
 import { renderHead, renderNav, renderFooter, renderClientScript, FONT_PAIRS } from './common.js';
 
 export function renderThesisStory(siteData, currentPath = '/') {
@@ -12,7 +12,7 @@ export function renderThesisStory(siteData, currentPath = '/') {
   const content = site.content || {};
   const hero = content.hero || {};
   const about = content.about || {};
-  const primaryColor = site.theme_config?.primaryColor || '#854d0e'; // Warm literary amber
+  const primaryColor = sanitizeColor(site.theme_config?.primaryColor, '#854d0e'); // Warm literary amber
   const fontPair = FONT_PAIRS['merriweather-roboto'];
 
   // Helper for reading time
